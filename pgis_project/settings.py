@@ -29,12 +29,16 @@ DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
 raw_allowed_hosts = os.environ.get("ALLOWED_HOSTS", "")
 ALLOWED_HOSTS = [host.strip() for host in raw_allowed_hosts.split(",") if host.strip()]
 
-if not ALLOWED_HOSTS:
-    ALLOWED_HOSTS = [
-        "127.0.0.1",
-        "localhost",
-        "participatorymapping-production.up.railway.app",
-    ]
+default_allowed_hosts = [
+    "127.0.0.1",
+    "localhost",
+    "participatorymapping-production.up.railway.app",
+    ".up.railway.app",
+]
+
+for host in default_allowed_hosts:
+    if host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(host)
 
 
 # Application definition
