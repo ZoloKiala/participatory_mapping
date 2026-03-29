@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+.venv/
+pgis/
+
+# Django / local runtime
+*.sqlite3
+*.log
+media/
+staticfiles/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Data and bulky assets (keep code only)
+*.zip
+*.rar
+*.xlsx
+*.xls
+*.csv
+*.geojson
+*.shp
+*.shx
+*.dbf
+*.prj
+*.sbn
+*.sbx
+*.cpg
+*.CPG
+*.xml
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.tif
+*.tiff
+
+# Project-specific bulky folders
+Chikwawa A/
+Mchinji/
+Mongochi/
+Mulanje-20260327T213357Z-1-001/
+Salima A-20260327T211626Z-1-001/
+
+# Keep core docs and source explicitly tracked
+!README.md
+!requirements.txt
+!manage.py

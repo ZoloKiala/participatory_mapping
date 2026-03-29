@@ -1,0 +1,109 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Participatory Mapping and Indicator Selection</title>
+  <script>
+    (function () {
+      try {
+        if (window.sessionStorage.getItem("pgis_skip_loader_once") === "1") {
+          document.documentElement.classList.add("skip-loader");
+          window.sessionStorage.removeItem("pgis_skip_loader_once");
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="stylesheet" href="{% static 'participatory/app.css' %}">
+</head>
+<body>
+  <div id="app-loader" class="app-loader" role="status" aria-live="polite" aria-label="Loading map data">
+    <div class="app-loader-card">
+      <div class="loader-brand" aria-hidden="true">
+        <img
+          class="loader-logo-main"
+          src="https://archive.iwmi.org/wle/sites/default/files/styles/two_column_paragraph_image__460px_width_/public/Logos/partner-logos/198fbe5f-iwmi-logo-300/index.jpg?itok=39uCICSg"
+          alt=""
+          loading="lazy"
+        >
+        <span class="loader-side-text">Soil and Water Accelerator</span>
+      </div>
+      <div class="loader-mark" aria-hidden="true">
+        <span class="pin-core"></span>
+        <span class="pin-pulse p1"></span>
+        <span class="pin-pulse p2"></span>
+      </div>
+      <p class="loader-title">Preparing Participatory Map</p>
+      <p class="loader-subtitle">Loading indicators and map layers...</p>
+    </div>
+  </div>
+
+  <main class="layout">
+    <section class="panel" id="sidebar-panel">
+      <div class="title-box">
+        <h1>Participatory Mapping and Indicator Selection</h1>
+      </div>
+      <p class="muted">Loaded locations: {{ filtered_count }}</p>
+
+      <form method="get" class="filters">
+        <label>District
+          <select name="district">
+            <option value="">All</option>
+            {% for district in districts %}
+              <option value="{{ district }}" {% if current.district == district %}selected{% endif %}>{{ district }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>Indicator
+          <select name="indicator" multiple size="7">
+            <option value="" {% if not current.indicators %}selected{% endif %}>All</option>
+            {% for indicator in indicators %}
+              <option value="{{ indicator }}" {% if indicator in current.indicators %}selected{% endif %}>{{ indicator }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>Severity min
+          <input type="number" name="severity_min" value="{{ current.severity_min }}">
+        </label>
+
+        <label>Severity max
+          <input type="number" name="severity_max" value="{{ current.severity_max }}">
+        </label>
+
+        <label>Search label
+          <input type="text" name="q" value="{{ current.q }}" placeholder="e.g. flood, erosion">
+        </label>
+
+        <button type="submit">Apply Filters</button>
+      </form>
+
+      <h2>Top Indicators (Filtered)</h2>
+      <ul class="top-list">
+        {% for row in indicator_counts %}
+          <li><span>{{ row.indicator|default:'(blank)' }}</span><strong>{{ row.count }}</strong></li>
+        {% empty %}
+          <li>No indicators found.</li>
+        {% endfor %}
+      </ul>
+
+    </section>
+
+    <section class="map-wrap">
+      <div id="map"></div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    window.PGIS = {
+      locationsUrl: "{% url 'locations_geojson' %}?{{ query_string|safe }}",
+      indicatorApiUrl: "{% url 'selection_results' %}?{{ query_string|safe }}"
+    };
+  </script>
+  <script src="{% static 'participatory/app.js' %}"></script>
+</body>
+</html>
