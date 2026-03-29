@@ -6,15 +6,15 @@ from django.views.decorators.http import require_GET, require_POST
 from .models import IndicatorSelection, Location
 
 
-def _apply_location_filters(request: HttpRequest):
+def _apply_location_filters_from_params(params):
     queryset = Location.objects.all()
 
-    district = request.GET.get("district", "").strip()
-    indicators = [value.strip() for value in request.GET.getlist("indicator") if value.strip()]
-    q = request.GET.get("q", "").strip()
+    district = params.get("district", "").strip()
+    indicators = [value.strip() for value in params.getlist("indicator") if value.strip()]
+    q = params.get("q", "").strip()
 
-    severity_min = request.GET.get("severity_min", "").strip()
-    severity_max = request.GET.get("severity_max", "").strip()
+    severity_min = params.get("severity_min", "").strip()
+    severity_max = params.get("severity_max", "").strip()
 
     if district:
         queryset = queryset.filter(district=district)
@@ -37,10 +37,24 @@ def _apply_location_filters(request: HttpRequest):
     return queryset
 
 
+def _apply_location_filters(request: HttpRequest):
+    return _apply_location_filters_from_params(request.GET)
+
+
 @require_GET
 def dashboard(request: HttpRequest) -> HttpResponse:
-    filtered_qs = _apply_location_filters(request)
-    districts = Location.objects.order_by("district").values_list("district", flat=True).distinct()
+    districts = list(
+        Location.objects.order_by("district").values_list("district", flat=True).distinct()
+    )
+    params = request.GET.copy()
+    selected_district = params.get("district", "").strip()
+
+    # First page load: preselect the first district so users start with a focused view.
+    if not request.GET and not selected_district and districts:
+        selected_district = districts[0]
+        params["district"] = selected_district
+
+    filtered_qs = _apply_location_filters_from_params(params)
     indicators = (
         Location.objects.exclude(indicator="")
         .order_by("indicator")
@@ -61,13 +75,13 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "filtered_count": filtered_qs.count(),
         "indicator_counts": indicator_counts,
         "current": {
-            "district": request.GET.get("district", ""),
-            "indicators": [value.strip() for value in request.GET.getlist("indicator") if value.strip()],
-            "severity_min": request.GET.get("severity_min", ""),
-            "severity_max": request.GET.get("severity_max", ""),
-            "q": request.GET.get("q", ""),
+            "district": selected_district,
+            "indicators": [value.strip() for value in params.getlist("indicator") if value.strip()],
+            "severity_min": params.get("severity_min", ""),
+            "severity_max": params.get("severity_max", ""),
+            "q": params.get("q", ""),
         },
-        "query_string": request.GET.urlencode(),
+        "query_string": params.urlencode(),
     }
     return render(request, "participatory/dashboard.html", context)
 
