@@ -4,6 +4,7 @@
     document.body.classList.add("is-loading");
   }
   const appLoader = document.getElementById("app-loader");
+  const pointsLoader = document.getElementById("points-loader");
   if (skipLoader && appLoader) {
     appLoader.classList.add("is-hidden");
   }
@@ -17,6 +18,12 @@
       appLoader.classList.add("is-hidden");
       document.body.classList.remove("is-loading");
     }, wait);
+  }
+
+  function hidePointsLoader() {
+    if (pointsLoader) {
+      pointsLoader.classList.add("is-hidden");
+    }
   }
 
   // Failsafe: never leave the app blocked by the loader.
@@ -289,6 +296,7 @@
       requestAnimationFrame(() => {
         centerOnFeatures(features, layer);
         hideLoader();
+        hidePointsLoader();
       });
 
       addLegendControl(indicatorColors);
@@ -297,6 +305,7 @@
       // Keep map usable even if data fails to load.
       console.error("Failed to load locations", err);
       hideLoader();
+      hidePointsLoader();
     });
 
 })();

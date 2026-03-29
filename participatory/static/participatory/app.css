@@ -315,6 +315,40 @@ button:hover { filter: brightness(1.04); }
   min-height: 0;
 }
 
+.points-loader {
+  position: absolute;
+  z-index: 1300;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(25, 33, 31, 0.25);
+  background: rgba(255, 250, 243, 0.94);
+  color: #1f2b29;
+  font-size: 0.85rem;
+  box-shadow: 0 8px 18px rgba(12, 22, 20, 0.15);
+  transition: opacity 220ms ease, visibility 220ms ease;
+}
+
+.points-loader.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.points-loader-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(31, 43, 41, 0.22);
+  border-top-color: #1d7b5f;
+  border-radius: 50%;
+  animation: spin-anim 0.75s linear infinite;
+}
+
 #map {
   position: absolute;
   inset: 0;
