@@ -24,7 +24,7 @@
       <div class="loader-brand" aria-hidden="true">
         <img
           class="loader-logo-main"
-          src="https://archive.iwmi.org/wle/sites/default/files/styles/two_column_paragraph_image__460px_width_/public/Logos/partner-logos/198fbe5f-iwmi-logo-300/index.jpg?itok=39uCICSg"
+          src="https://branding.iwmi.org/wp-content/uploads/2020/02/three-e1584035789729.jpg"
           alt=""
           loading="lazy"
         >
@@ -78,7 +78,10 @@
           <input type="text" name="q" value="{{ current.q }}" placeholder="e.g. flood, erosion">
         </label>
 
-        <button type="submit">Apply Filters</button>
+        <button type="submit" class="apply-btn">
+          <span class="apply-btn-label" data-default="Apply Filters" data-loading="Applying...">Apply Filters</span>
+          <span class="apply-btn-spinner" aria-hidden="true"></span>
+        </button>
       </form>
 
       <h2>Top Indicators (Filtered)</h2>

@@ -253,6 +253,45 @@ button {
 
 button:hover { filter: brightness(1.04); }
 
+.apply-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.apply-btn-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  display: none;
+  animation: spin-anim 0.75s linear infinite;
+}
+
+.apply-btn.is-loading {
+  opacity: 1;
+  cursor: wait;
+}
+
+.apply-btn:disabled {
+  opacity: 1;
+}
+
+.apply-btn.is-loading .apply-btn-spinner {
+  display: inline-block;
+}
+
+.apply-btn.is-loading .apply-btn-label {
+  opacity: 0.96;
+}
+
+@keyframes spin-anim {
+  to { transform: rotate(360deg); }
+}
+
 .top-list {
   margin: 0;
   padding: 0;

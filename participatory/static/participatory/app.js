@@ -231,10 +231,31 @@
 
   const filterForm = document.querySelector("form.filters");
   if (filterForm) {
-    filterForm.addEventListener("submit", () => {
+    let submitting = false;
+    filterForm.addEventListener("submit", (event) => {
+      if (submitting) {
+        return;
+      }
+      event.preventDefault();
+      submitting = true;
+
+      const applyBtn = filterForm.querySelector(".apply-btn");
+      if (applyBtn) {
+        applyBtn.classList.add("is-loading");
+        applyBtn.disabled = true;
+        const label = applyBtn.querySelector(".apply-btn-label");
+        if (label && label.dataset.loading) {
+          label.textContent = label.dataset.loading;
+        }
+      }
       try {
         window.sessionStorage.setItem("pgis_skip_loader_once", "1");
       } catch (e) {}
+
+      // Allow at least one paint so spinner is visible before navigation.
+      window.requestAnimationFrame(() => {
+        window.setTimeout(() => filterForm.submit(), 450);
+      });
     });
   }
 
