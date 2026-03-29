@@ -23,8 +23,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-j1%5i2p97rs68#k6k^p^5@bqpn^y8o1+a6c&#ltmk!m8yz8*vm'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+is_railway = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PROJECT_ID"))
+
+# SECURITY WARNING: don't run with debug turned on in production.
+# Local default is True for easier development; Railway defaults to False.
+DEBUG = _env_bool("DEBUG", default=not is_railway)
 
 raw_allowed_hosts = os.environ.get("ALLOWED_HOSTS", "")
 ALLOWED_HOSTS = [host.strip() for host in raw_allowed_hosts.split(",") if host.strip()]
@@ -39,6 +49,10 @@ default_allowed_hosts = [
 for host in default_allowed_hosts:
     if host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(host)
+
+railway_public_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
+if railway_public_domain and railway_public_domain not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(railway_public_domain)
 
 
 # Application definition

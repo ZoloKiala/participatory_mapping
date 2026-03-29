@@ -21,6 +21,15 @@ Open:
 - `http://127.0.0.1:8000/` for the dashboard map + filters + indicator submissions
 - `http://127.0.0.1:8000/admin/` for Django admin
 
+## Environment Defaults
+
+- Local development defaults to `DEBUG=true`.
+- Railway defaults to `DEBUG=false`.
+- Copy `.env.example` if you want explicit local env values.
+- On Railway, set:
+  - `DEBUG=false`
+  - `ALLOWED_HOSTS=participatorymapping-production.up.railway.app,.up.railway.app`
+
 ## API Endpoints
 
 - `GET /api/locations.geojson`  
@@ -31,4 +40,3 @@ Open:
   Submitted indicator selections summary
 - `POST /selections/submit`  
   Submit indicator selection (`indicator`, optional `district`, optional `rationale`)
-
