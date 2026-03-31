@@ -253,12 +253,123 @@ button {
 
 button:hover { filter: brightness(1.04); }
 
+fieldset {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 0;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+legend {
+  padding: 0 6px;
+  font-weight: 700;
+  color: #1f3a35;
+}
+
+.indicator-group {
+  --group-accent: #7d8f89;
+  --group-soft: rgba(125, 143, 137, 0.16);
+  border: 1px solid var(--group-accent);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--group-soft), rgba(255, 255, 255, 0.86));
+  margin-bottom: 8px;
+}
+
+.indicator-group summary {
+  margin: 0;
+  padding: 7px 10px;
+  font-weight: 700;
+  color: var(--group-accent);
+  cursor: pointer;
+}
+
+.indicator-group .indicator-option {
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.indicator-group .indicator-option input[type="checkbox"] {
+  accent-color: var(--group-accent);
+}
+
+.indicator-group--water {
+  --group-accent: #0f766e;
+  --group-soft: rgba(15, 118, 110, 0.15);
+}
+
+.indicator-group--soil {
+  --group-accent: #b45309;
+  --group-soft: rgba(180, 83, 9, 0.14);
+}
+
+.indicator-group--productivity {
+  --group-accent: #2f855a;
+  --group-soft: rgba(47, 133, 90, 0.14);
+}
+
+.indicator-group--ecosystem {
+  --group-accent: #2563eb;
+  --group-soft: rgba(37, 99, 235, 0.14);
+}
+
+.indicator-group--rangeland {
+  --group-accent: #8b5cf6;
+  --group-soft: rgba(139, 92, 246, 0.13);
+}
+
+.indicator-group--governance {
+  --group-accent: #db2777;
+  --group-soft: rgba(219, 39, 119, 0.14);
+}
+
+.indicator-group--other {
+  --group-accent: #6b7280;
+  --group-soft: rgba(107, 114, 128, 0.12);
+}
+
 .apply-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   min-height: 40px;
+}
+
+.filter-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.reset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.reset-btn:hover,
+.reset-btn:focus-visible {
+  background: #f5ebdb;
+}
+
+.reset-icon-btn {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .apply-btn-spinner {
@@ -310,15 +421,105 @@ button:hover { filter: brightness(1.04); }
 
 .top-list li:last-child { border-bottom: none; }
 
+.top-indicator-row {
+  --row-accent: #6b7280;
+  box-shadow: inset 4px 0 0 var(--row-accent);
+}
+
+.top-indicator-row--water { --row-accent: #0f766e; }
+.top-indicator-row--soil { --row-accent: #b45309; }
+.top-indicator-row--productivity { --row-accent: #2f855a; }
+.top-indicator-row--ecosystem { --row-accent: #2563eb; }
+.top-indicator-row--rangeland { --row-accent: #8b5cf6; }
+.top-indicator-row--governance { --row-accent: #db2777; }
+.top-indicator-row--other { --row-accent: #6b7280; }
+
+.hotspot-link {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: color 120ms ease;
+}
+
+.hotspot-link:hover,
+.hotspot-link:focus-visible {
+  filter: none;
+  color: inherit;
+  text-decoration: underline;
+}
+
 .map-wrap {
   position: relative;
   min-height: 0;
 }
 
+.map-search-control {
+  position: absolute;
+  z-index: 1300;
+  top: 152px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.map-search-toggle {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+}
+
+.map-search-toggle:hover {
+  filter: none;
+  background: #f7f0e5;
+}
+
+.map-search-panel {
+  display: none;
+  width: min(360px, calc(100vw - 120px));
+}
+
+.map-search-icon {
+  font-size: 0.9rem;
+  opacity: 0.78;
+}
+
+.map-search-control.is-open .map-search-panel {
+  display: block;
+}
+
+.map-search-control.is-open .map-search-toggle {
+  background: #f2e7d6;
+}
+
+.map-search-panel input {
+  width: 100%;
+  background: #fff;
+}
+
 .points-loader {
   position: absolute;
   z-index: 1300;
-  top: 14px;
+  top: 82px;
   left: 50%;
   transform: translateX(-50%);
   display: inline-flex;

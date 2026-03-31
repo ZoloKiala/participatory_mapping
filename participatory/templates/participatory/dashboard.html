@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Participatory Mapping and Indicator Selection</title>
+  <title>Participatory Hotspot Mapping</title>
   <script>
     (function () {
       try {
@@ -35,7 +35,7 @@
         <span class="pin-pulse p1"></span>
         <span class="pin-pulse p2"></span>
       </div>
-      <p class="loader-title">Preparing Participatory Map</p>
+      <p class="loader-title">Preparing Participatory Hotspot Map</p>
       <p class="loader-subtitle">Loading indicators and map layers...</p>
     </div>
   </div>
@@ -43,51 +43,87 @@
   <main class="layout">
     <section class="panel" id="sidebar-panel">
       <div class="title-box">
-        <h1>Participatory Mapping and Indicator Selection</h1>
+        <h1>Participatory Hotspot Mapping</h1>
       </div>
       <p class="muted">Loaded locations: {{ filtered_count }}</p>
 
-      <form method="get" class="filters">
-        <label>District
+      <form method="get" class="filters" id="filters-form">
+        <label><strong>District</strong>
           <select name="district">
-            <option value="">All</option>
             {% for district in districts %}
               <option value="{{ district }}" {% if current.district == district %}selected{% endif %}>{{ district }}</option>
             {% endfor %}
           </select>
         </label>
 
-        <label>Indicator
-          <select name="indicator" multiple size="7">
-            <option value="" {% if not current.indicators %}selected{% endif %}>All</option>
-            {% for indicator in indicators %}
-              <option value="{{ indicator }}" {% if indicator in current.indicators %}selected{% endif %}>{{ indicator }}</option>
+        <fieldset>
+          <legend>Environmental Issues</legend>
+          {% for group in indicator_option_groups %}
+            <details class="indicator-group indicator-group--{{ group.key }}" data-indicator-group="{{ group.name }}">
+              <summary class="muted">{{ group.name }}</summary>
+              {% for indicator in group.items %}
+                <label class="indicator-option" data-indicator-group="{{ group.name }}">
+                  <input type="checkbox" name="indicator" value="{{ indicator }}" {% if indicator in current.indicators %}checked{% endif %}>
+                  {% if indicator == 'land tenure' %}
+                    Land tenure issues
+                  {% elif indicator == 'grazing pressure (high)' %}
+                    Grazing Pressure (High)
+                  {% else %}
+                    {{ indicator|capfirst }}
+                  {% endif %}
+                </label>
+              {% endfor %}
+            </details>
+          {% endfor %}
+        </fieldset>
+
+        <label><strong>Category</strong>
+          <select name="category" multiple size="5">
+            <option value="" {% if not current.categories %}selected{% endif %}>All</option>
+            {% for category in categories %}
+              <option value="{{ category.value }}" {% if category.value in current.categories %}selected{% endif %}>{{ category.label }}</option>
             {% endfor %}
           </select>
         </label>
 
-        <label>Severity min
-          <input type="number" name="severity_min" value="{{ current.severity_min }}">
-        </label>
+        <fieldset>
+          <legend>Severity</legend>
+          <label>
+            <select name="severity">
+              <option value="" {% if not current.severity %}selected{% endif %}>All</option>
+              <option value="1" {% if current.severity == '1' %}selected{% endif %}>1 - Low severe</option>
+              <option value="3" {% if current.severity == '3' %}selected{% endif %}>3 - Moderate severity</option>
+              <option value="5" {% if current.severity == '5' %}selected{% endif %}>5 - High severity</option>
+            </select>
+          </label>
+        </fieldset>
 
-        <label>Severity max
-          <input type="number" name="severity_max" value="{{ current.severity_max }}">
-        </label>
-
-        <label>Search label
-          <input type="text" name="q" value="{{ current.q }}" placeholder="e.g. flood, erosion">
-        </label>
-
-        <button type="submit" class="apply-btn">
-          <span class="apply-btn-label" data-default="Apply Filters" data-loading="Applying...">Apply Filters</span>
-          <span class="apply-btn-spinner" aria-hidden="true"></span>
-        </button>
+        <div class="filter-actions">
+          <button type="submit" class="apply-btn">
+            <span class="apply-btn-label" data-default="Apply Filters" data-loading="Applying...">Apply Filters</span>
+            <span class="apply-btn-spinner" aria-hidden="true"></span>
+          </button>
+          <a href="/" class="reset-btn reset-icon-btn" data-skip-loader="1" aria-label="Reset filters" title="Reset filters">
+            ↺
+          </a>
+        </div>
       </form>
 
-      <h2>Top Indicators (Filtered)</h2>
+      <h2>Identified Environmental Hotspots</h2>
       <ul class="top-list">
         {% for row in indicator_counts %}
-          <li><span>{{ row.indicator|default:'(blank)' }}</span><strong>{{ row.count }}</strong></li>
+          <li class="top-indicator-row top-indicator-row--{{ row.category_key }}">
+            <button type="button" class="hotspot-link hotspot-item" aria-pressed="false">
+              {% if row.indicator == 'land tenure' %}
+                Land tenure issues
+              {% elif row.indicator == 'grazing pressure (high)' %}
+                Grazing Pressure (High)
+              {% else %}
+                {{ row.indicator|capfirst|default:'(blank)' }}
+              {% endif %}
+            </button>
+            <strong>{{ row.count }}</strong>
+          </li>
         {% empty %}
           <li>No indicators found.</li>
         {% endfor %}
@@ -96,6 +132,26 @@
     </section>
 
     <section class="map-wrap">
+      <div class="map-search-control{% if current.q %} is-open{% endif %}">
+        <button
+          type="button"
+          class="map-search-toggle"
+          aria-label="Search label"
+          aria-expanded="{% if current.q %}true{% else %}false{% endif %}"
+        >
+          <span class="map-search-icon" aria-hidden="true">🔍</span>
+        </button>
+        <div class="map-search-panel">
+          <input
+            type="text"
+            name="q"
+            form="filters-form"
+            value="{{ current.q }}"
+            aria-label="Search label"
+            placeholder="e.g. flood, erosion"
+          >
+        </div>
+      </div>
       <div id="points-loader" class="points-loader" role="status" aria-live="polite">
         <span class="points-loader-spinner" aria-hidden="true"></span>
         <span>Loading points...</span>
@@ -111,6 +167,6 @@
       indicatorApiUrl: "{% url 'selection_results' %}?{{ query_string|safe }}"
     };
   </script>
-  <script src="{% static 'participatory/app.js' %}"></script>
+  <script src="{% static 'participatory/app.js' %}?v=20260331-all-districts-fixed8"></script>
 </body>
 </html>

@@ -1,4 +1,7 @@
-from django.db.models import Count
+import re
+from collections import Counter
+
+from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_POST
@@ -6,12 +9,229 @@ from django.views.decorators.http import require_GET, require_POST
 from .models import IndicatorSelection, Location
 
 
+CATEGORY_RE = re.compile(r"(older|younger|young)_(men|women)", re.IGNORECASE)
+INDICATOR_TYPO_FIXES = {
+    "permamnent": "permanent",
+    "permenent": "permanent",
+    "permanant": "permanent",
+    "seassonal": "seasonal",
+    "nutirent": "nutrient",
+    "grazzing": "grazing",
+    "gulley": "gully",
+}
+INDICATOR_TOKEN_SINGULAR = {
+    "conflicts": "conflict",
+    "disputes": "dispute",
+    "corridors": "corridor",
+    "wetlands": "wetland",
+    "yields": "yield",
+}
+INDICATOR_CATEGORY_ORDER = [
+    "Water Resources Indicators",
+    "Soil Erosion Indicators",
+    "Productivity Indicators",
+    "Land and Ecosystem Indicators",
+    "Rangeland and Livestock Indicators",
+    "Socioeconomic and Governance Indicators",
+    "Other Indicators",
+]
+INDICATOR_CATEGORY_KEYS = {
+    "Water Resources Indicators": "water",
+    "Soil Erosion Indicators": "soil",
+    "Productivity Indicators": "productivity",
+    "Land and Ecosystem Indicators": "ecosystem",
+    "Rangeland and Livestock Indicators": "rangeland",
+    "Socioeconomic and Governance Indicators": "governance",
+    "Other Indicators": "other",
+}
+
+
+def _normalize_category(value: str) -> str:
+    normalized = (value or "").strip().replace(" ", "_")
+    lower = normalized.lower()
+    if lower == "young_men":
+        return "Younger_Men"
+    if lower == "young_women":
+        return "Younger_Women"
+
+    match = CATEGORY_RE.search(normalized)
+    if not match:
+        return normalized
+
+    age, gender = match.groups()
+    if age.lower() == "young":
+        age = "Younger"
+    else:
+        age = age.capitalize()
+    return f"{age}_{gender.capitalize()}"
+
+
+def _category_tokens_for_filter(category: str) -> list[str]:
+    normalized = _normalize_category(category)
+    if normalized == "Younger_Men":
+        return ["Younger_Men", "Young_Men"]
+    if normalized == "Younger_Women":
+        return ["Younger_Women", "Young_Women"]
+    return [normalized]
+
+
+def _available_categories() -> list[str]:
+    categories = set()
+    for source_file in Location.objects.exclude(source_file="").values_list("source_file", flat=True):
+        match = CATEGORY_RE.search(source_file or "")
+        if match:
+            categories.add(_normalize_category(match.group(0)))
+    return sorted(categories)
+
+
+def _format_category_label(category: str) -> str:
+    label = (category or "").replace("_", " ").strip().lower()
+    if not label:
+        return ""
+    return label[0].upper() + label[1:]
+
+
+def _normalize_indicator(value: str) -> str:
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        return ""
+
+    normalized = normalized.replace("-", " ").replace("_", " ")
+    normalized = re.sub(r"\s+", " ", normalized)
+
+    words = [INDICATOR_TYPO_FIXES.get(token, token) for token in normalized.split(" ")]
+    normalized = " ".join(words)
+
+    normalized = normalized.replace("wild life", "wildlife")
+    normalized = normalized.replace("river bank", "riverbank")
+    normalized = normalized.replace("bore hole", "borehole")
+
+    normalized = normalized.replace("riverbank collapsed", "riverbank collapse")
+    normalized = normalized.replace("seasonal stream", "stream seasonal")
+    if normalized == "flooding":
+        normalized = "flood"
+    if "grazing" in normalized:
+        return "grazing pressure (high)"
+
+    parts = normalized.split(" ")
+    if parts:
+        parts[-1] = INDICATOR_TOKEN_SINGULAR.get(parts[-1], parts[-1])
+    return " ".join(parts)
+
+
+def _indicator_groups() -> dict[str, set[str]]:
+    groups: dict[str, set[str]] = {}
+    indicators = (
+        Location.objects.exclude(indicator="")
+        .values_list("indicator", flat=True)
+        .distinct()
+    )
+    for indicator in indicators:
+        key = _normalize_indicator(indicator)
+        if not key:
+            continue
+        groups.setdefault(key, set()).add(indicator)
+    return groups
+
+
+def _indicator_category(indicator: str) -> str:
+    value = (indicator or "").lower()
+    if not value:
+        return "Other Indicators"
+
+    if any(
+        token in value
+        for token in [
+            "borehole",
+            "river",
+            "wetland",
+            "stream",
+            "water",
+            "dam",
+            "lake",
+            "run off",
+            "flood",
+            "irrigation",
+            "spring",
+            "shallow well",
+            "illegal abstraction",
+        ]
+    ):
+        return "Water Resources Indicators"
+
+    if any(token in value for token in ["erosion", "gully", "sedimentation", "terraces", "ridges"]):
+        return "Soil Erosion Indicators"
+
+    if any(token in value for token in ["yield", "fertility", "nutrient"]):
+        return "Productivity Indicators"
+
+    if any(
+        token in value
+        for token in [
+            "forest",
+            "reforestation",
+            "wildlife",
+            "pollinators",
+            "riparian",
+            "deforestation",
+        ]
+    ):
+        return "Land and Ecosystem Indicators"
+
+    if any(token in value for token in ["grazing", "pasture"]):
+        return "Rangeland and Livestock Indicators"
+
+    if any(token in value for token in ["priority", "women barriers", "land tenure"]):
+        return "Socioeconomic and Governance Indicators"
+
+    return "Other Indicators"
+
+
+def _group_indicators_by_category(indicators: list[str]) -> list[dict[str, object]]:
+    grouped: dict[str, list[str]] = {category: [] for category in INDICATOR_CATEGORY_ORDER}
+    for indicator in indicators:
+        grouped[_indicator_category(indicator)].append(indicator)
+
+    return [
+        {
+            "name": category,
+            "key": INDICATOR_CATEGORY_KEYS.get(category, "other"),
+            "items": grouped[category],
+        }
+        for category in INDICATOR_CATEGORY_ORDER
+        if grouped[category]
+    ]
+
+
+def _canonical_indicator_counts(queryset, limit: int = 15) -> list[dict[str, object]]:
+    counter: Counter[str] = Counter()
+    for indicator in queryset.exclude(indicator="").values_list("indicator", flat=True):
+        normalized = _normalize_indicator(indicator)
+        if normalized:
+            counter[normalized] += 1
+
+    rows = []
+    for indicator, count in sorted(counter.items(), key=lambda item: (-item[1], item[0]))[:limit]:
+        category = _indicator_category(indicator)
+        rows.append(
+            {
+                "indicator": indicator,
+                "count": count,
+                "category": category,
+                "category_key": INDICATOR_CATEGORY_KEYS.get(category, "other"),
+            }
+        )
+    return rows
+
+
 def _apply_location_filters_from_params(params):
     queryset = Location.objects.all()
 
     district = params.get("district", "").strip()
     indicators = [value.strip() for value in params.getlist("indicator") if value.strip()]
+    categories = [_normalize_category(value) for value in params.getlist("category") if value.strip()]
     q = params.get("q", "").strip()
+    severity = params.get("severity", "").strip()
 
     severity_min = params.get("severity_min", "").strip()
     severity_max = params.get("severity_max", "").strip()
@@ -19,20 +239,37 @@ def _apply_location_filters_from_params(params):
     if district:
         queryset = queryset.filter(district=district)
     if indicators:
-        queryset = queryset.filter(indicator__in=indicators)
+        grouped_indicators = _indicator_groups()
+        expanded_indicators = set()
+        for selected in indicators:
+            normalized_selected = _normalize_indicator(selected)
+            if normalized_selected in grouped_indicators:
+                expanded_indicators.update(grouped_indicators[normalized_selected])
+            elif selected:
+                expanded_indicators.add(selected)
+        queryset = queryset.filter(indicator__in=expanded_indicators)
+    if categories:
+        source_file_query = Q()
+        for category in categories:
+            for token in _category_tokens_for_filter(category):
+                source_file_query |= Q(source_file__icontains=f"{token}_")
+        queryset = queryset.filter(source_file_query)
     if q:
         queryset = queryset.filter(label__icontains=q)
 
-    if severity_min:
-        try:
-            queryset = queryset.filter(severity__gte=int(severity_min))
-        except ValueError:
-            pass
-    if severity_max:
-        try:
-            queryset = queryset.filter(severity__lte=int(severity_max))
-        except ValueError:
-            pass
+    if severity in {"1", "3", "5"}:
+        queryset = queryset.filter(severity=int(severity))
+    else:
+        if severity_min:
+            try:
+                queryset = queryset.filter(severity__gte=int(severity_min))
+            except ValueError:
+                pass
+        if severity_max:
+            try:
+                queryset = queryset.filter(severity__lte=int(severity_max))
+            except ValueError:
+                pass
 
     return queryset
 
@@ -48,35 +285,44 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     )
     params = request.GET.copy()
     selected_district = params.get("district", "").strip()
+    default_salima = next((district for district in districts if district.lower() == "salima"), "")
 
-    # First page load: preselect the first district so users start with a focused view.
-    if not request.GET and not selected_district and districts:
-        selected_district = districts[0]
-        params["district"] = selected_district
+    if not request.GET and not selected_district and default_salima:
+        selected_district = default_salima
+        params["district"] = default_salima
 
     filtered_qs = _apply_location_filters_from_params(params)
-    indicators = (
-        Location.objects.exclude(indicator="")
-        .order_by("indicator")
-        .values_list("indicator", flat=True)
-        .distinct()
-    )
+    grouped_indicators = _indicator_groups()
+    indicators = sorted(grouped_indicators.keys())
+    indicator_option_groups = _group_indicators_by_category(indicators)
 
-    indicator_counts = (
-        filtered_qs.exclude(indicator="")
-        .values("indicator")
-        .annotate(count=Count("id"))
-        .order_by("-count", "indicator")[:15]
-    )
+    indicator_counts = _canonical_indicator_counts(filtered_qs, limit=15)
+    for row in indicator_counts:
+        row_params = params.copy()
+        row_params.setlist("indicator", [row["indicator"]])
+        row["filter_query"] = row_params.urlencode()
 
     context = {
         "districts": districts,
-        "indicators": indicators,
+        "indicator_option_groups": indicator_option_groups,
+        "categories": [
+            {"value": category, "label": _format_category_label(category)}
+            for category in _available_categories()
+        ],
         "filtered_count": filtered_qs.count(),
         "indicator_counts": indicator_counts,
         "current": {
             "district": selected_district,
-            "indicators": [value.strip() for value in params.getlist("indicator") if value.strip()],
+            "indicator": (
+                _normalize_indicator(params.get("indicator", "").strip())
+                if params.get("indicator", "").strip()
+                else ""
+            ),
+            "indicators": [
+                _normalize_indicator(value) for value in params.getlist("indicator") if value.strip()
+            ],
+            "categories": [_normalize_category(value) for value in params.getlist("category") if value.strip()],
+            "severity": params.get("severity", "").strip(),
             "severity_min": params.get("severity_min", ""),
             "severity_max": params.get("severity_max", ""),
             "q": params.get("q", ""),
