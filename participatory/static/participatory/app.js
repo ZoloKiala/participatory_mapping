@@ -157,6 +157,187 @@
     applyState(savedCollapsed);
   }
 
+  function setupMeasureTool() {
+    const mapContainer = map.getContainer();
+    let isMeasuring = false;
+    const measurePoints = [];
+    const measureLayer = L.layerGroup().addTo(map);
+    let toggleButton = null;
+    let clearButton = null;
+
+    function formatDistance(meters) {
+      if (meters >= 1000) {
+        return `${(meters / 1000).toFixed(2)} km`;
+      }
+      return `${Math.round(meters)} m`;
+    }
+
+    function formatArea(squareMeters) {
+      if (squareMeters >= 1000000) {
+        return `${(squareMeters / 1000000).toFixed(2)} km²`;
+      }
+      if (squareMeters >= 10000) {
+        return `${(squareMeters / 10000).toFixed(2)} ha`;
+      }
+      return `${Math.round(squareMeters)} m²`;
+    }
+
+    function totalDistance(points) {
+      let meters = 0;
+      for (let i = 1; i < points.length; i += 1) {
+        meters += points[i - 1].distanceTo(points[i]);
+      }
+      return meters;
+    }
+
+    function geodesicArea(points) {
+      if (points.length < 3) return 0;
+      const d2r = Math.PI / 180;
+      const radius = 6378137.0;
+      let area = 0;
+
+      for (let i = 0; i < points.length; i += 1) {
+        const p1 = points[i];
+        const p2 = points[(i + 1) % points.length];
+        area +=
+          ((p2.lng - p1.lng) * d2r) *
+          (2 + Math.sin(p1.lat * d2r) + Math.sin(p2.lat * d2r));
+      }
+
+      return Math.abs((area * radius * radius) / 2.0);
+    }
+
+    function updateButtons() {
+      if (toggleButton) {
+        toggleButton.classList.toggle("is-active", isMeasuring);
+        toggleButton.setAttribute(
+          "title",
+          isMeasuring ? "Stop measuring" : "Start measuring"
+        );
+        toggleButton.setAttribute(
+          "aria-label",
+          isMeasuring ? "Stop measuring" : "Start measuring"
+        );
+      }
+      if (clearButton) {
+        const hasPoints = measurePoints.length > 0;
+        clearButton.classList.toggle("is-disabled", !hasPoints);
+        clearButton.setAttribute("aria-disabled", hasPoints ? "false" : "true");
+      }
+      mapContainer.classList.toggle("is-measuring", isMeasuring);
+    }
+
+    function renderMeasurement() {
+      measureLayer.clearLayers();
+      let polygonLayer = null;
+
+      measurePoints.forEach((point) => {
+        L.circleMarker(point, {
+          radius: 5,
+          color: "#0b1720",
+          weight: 1,
+          fillColor: "#f97316",
+          fillOpacity: 1,
+          opacity: 1,
+        }).addTo(measureLayer);
+      });
+
+      if (measurePoints.length >= 2) {
+        L.polyline(measurePoints, {
+          color: "#f97316",
+          weight: 3,
+          opacity: 1,
+          dashArray: "9 6",
+        }).addTo(measureLayer);
+
+        let distanceMeters = totalDistance(measurePoints);
+        let distanceLabel = formatDistance(distanceMeters);
+
+        if (measurePoints.length >= 3) {
+          polygonLayer = L.polygon(measurePoints, {
+            color: "#f97316",
+            weight: 1,
+            fillColor: "#f97316",
+            fillOpacity: 0.12,
+            opacity: 0.65,
+          }).addTo(measureLayer);
+          distanceMeters += measurePoints[measurePoints.length - 1].distanceTo(measurePoints[0]);
+          distanceLabel = `Perimeter: ${formatDistance(distanceMeters)}`;
+        }
+
+        const endPoint = measurePoints[measurePoints.length - 1];
+        L.marker(endPoint, {
+          interactive: false,
+          icon: L.divIcon({
+            className: "measure-distance-label",
+            html: `<span>${distanceLabel}</span>`,
+          }),
+        }).addTo(measureLayer);
+
+        if (polygonLayer) {
+          const areaMeters = geodesicArea(measurePoints);
+          const center = polygonLayer.getBounds().getCenter();
+          L.marker(center, {
+            interactive: false,
+            icon: L.divIcon({
+              className: "measure-area-label",
+              html: `<span>Area: ${formatArea(areaMeters)}</span>`,
+            }),
+          }).addTo(measureLayer);
+        }
+      }
+
+      updateButtons();
+    }
+
+    function clearMeasurement() {
+      measurePoints.length = 0;
+      measureLayer.clearLayers();
+      updateButtons();
+    }
+
+    const MeasureControl = L.Control.extend({
+      options: { position: "topleft" },
+      onAdd() {
+        const container = L.DomUtil.create("div", "leaflet-control measure-control");
+        const bar = L.DomUtil.create("div", "leaflet-bar", container);
+
+        toggleButton = L.DomUtil.create("a", "measure-map-toggle", bar);
+        toggleButton.href = "#";
+        toggleButton.setAttribute("role", "button");
+        toggleButton.setAttribute("title", "Start measuring");
+        toggleButton.setAttribute("aria-label", "Start measuring");
+
+        clearButton = L.DomUtil.create("a", "measure-map-clear", bar);
+        clearButton.href = "#";
+        clearButton.setAttribute("role", "button");
+        clearButton.setAttribute("title", "Clear measurement");
+        clearButton.setAttribute("aria-label", "Clear measurement");
+
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(toggleButton, "click", (event) => {
+          L.DomEvent.preventDefault(event);
+          isMeasuring = !isMeasuring;
+          updateButtons();
+        });
+        L.DomEvent.on(clearButton, "click", (event) => {
+          L.DomEvent.preventDefault(event);
+          clearMeasurement();
+        });
+
+        updateButtons();
+        return container;
+      },
+    });
+
+    map.addControl(new MeasureControl());
+    map.on("click", (event) => {
+      if (!isMeasuring) return;
+      measurePoints.push(event.latlng);
+      renderMeasurement();
+    });
+  }
+
   const indicatorPalette = [
     "#1d4ed8",
     "#16a34a",
@@ -317,6 +498,7 @@
   }
 
   setupSidebarToggle();
+  setupMeasureTool();
 
   const filterForm = document.querySelector("form.filters");
   if (filterForm) {
@@ -390,6 +572,20 @@
     const toggle = container.querySelector(".map-search-toggle");
     const input = container.querySelector('input[name="q"]');
     if (!toggle || !input) return;
+    const initialQuery = input.value.trim();
+    let hadQuery = !!initialQuery;
+    let clearingInProgress = false;
+
+    const submitWithoutSearch = () => {
+      if (!filterForm || clearingInProgress) return;
+      clearingInProgress = true;
+      input.value = "";
+      if (typeof filterForm.requestSubmit === "function") {
+        filterForm.requestSubmit();
+      } else {
+        filterForm.submit();
+      }
+    };
 
     const setOpen = (isOpen) => {
       container.classList.toggle("is-open", isOpen);
@@ -401,6 +597,18 @@
 
     toggle.addEventListener("click", () => {
       setOpen(!container.classList.contains("is-open"));
+    });
+
+    input.addEventListener("input", () => {
+      const value = input.value.trim();
+      if (value) {
+        hadQuery = true;
+        return;
+      }
+      if (hadQuery) {
+        hadQuery = false;
+        submitWithoutSearch();
+      }
     });
 
     document.addEventListener("click", (event) => {
