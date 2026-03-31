@@ -422,6 +422,15 @@
     return indicatorColors.get(key)?.color || "#334155";
   }
 
+  function severityLabel(value) {
+    if (value === null || value === undefined || value === "") return "-";
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return `${value}`;
+    if (numeric <= 1) return `Low (${numeric})`;
+    if (numeric <= 3) return `Moderate (${numeric})`;
+    return `High (${numeric})`;
+  }
+
   function addLegendControl(indicatorColors) {
     document
       .querySelectorAll(".leaflet-control .map-legend")
@@ -723,7 +732,7 @@
             `<strong>${p.label || p.name}</strong><br>` +
             `District: ${p.district || "-"}<br>` +
             `Environmental issue: ${p.indicator || "-"}<br>` +
-            `Severity: ${p.severity ?? "-"}`
+            `Severity: ${severityLabel(p.severity)}`
           );
         },
       }).addTo(map);
