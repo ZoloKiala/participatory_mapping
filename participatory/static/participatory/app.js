@@ -354,13 +354,35 @@
   ];
 
   function indicatorLabel(value) {
-    return (value || "").toString().trim() || "Unspecified";
+    const normalized = normalizeIssueLabel(value);
+    if (!normalized) return "Unspecified";
+    if (normalized === "grazing pressure high") return "High Grazing Pressure";
+    if (normalized === "contour bund") return "Contour Bund (CB)";
+    if (normalized === "cb plus") return "CB+ (Contour Bund in Good Condition)";
+    if (normalized === "cb minus") return "CB- (Contour Bund in Bad Condition)";
+    if (normalized === "dam") return "Dam (Priority)";
+    if (normalized === "d plus") return "D+ (Dam in Good Condition)";
+    if (normalized === "d minus") return "D- (Dam in Bad Condition)";
+    if (normalized === "land tenure") return "Land tenure issues";
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  }
+
+  function popupLabel(value) {
+    return (value || "")
+      .toString()
+      .replace(/_/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   function normalizeIssueLabel(value) {
     let normalized = (value || "")
       .toString()
       .toLowerCase()
+      .replace("d+ (dam in good condition)", "d plus")
+      .replace("d- (dam in bad condition)", "d minus")
+      .replace("cb+ (contour bund in good condition)", "cb plus")
+      .replace("cb- (contour bund in bad condition)", "cb minus")
       .replace(/[()]/g, "")
       .replace(/[^a-z0-9\s_-]+/g, " ")
       .replace(/[_-]+/g, " ")
@@ -370,6 +392,21 @@
       .replace("river bank", "riverbank")
       .replace("land tenure issues", "land tenure")
       .replace("bore hole", "borehole")
+      .replace("good condition contour bund", "cb plus")
+      .replace("bad condition contour bund", "cb minus")
+      .replace("good contour bund", "cb plus")
+      .replace("bad contour bund", "cb minus")
+      .replace("cb+", "cb plus")
+      .replace("cb-", "cb minus")
+      .replace("good condition dam", "d plus")
+      .replace("bad condition dam", "d minus")
+      .replace("priority dam", "dam")
+      .replace("d+", "d plus")
+      .replace("d-", "d minus")
+      .replace("fertilty", "fertility")
+      .replace("yield decline", "yield loss")
+      .replace("nutrient loss areas", "nutrient loss")
+      .replace("nutrient loss area", "nutrient loss")
       .replace("riverbank collapsed", "riverbank collapse")
       .replace("seasonal stream", "stream seasonal")
       .replace("gulley", "gully");
@@ -460,7 +497,7 @@
         })
         .map(
           ({ label, color }) =>
-            `<div class="row"><span class="swatch" style="background:${color}"></span><span>${label}</span></div>`
+            `<div class="row"><span class="swatch" style="background:${color}"></span><span>${indicatorLabel(label)}</span></div>`
         )
         .join("");
       div.innerHTML = `<h4>Hotspots</h4>${rows}`;
@@ -575,6 +612,41 @@
 
   setupIndicatorGroupsCollapsible();
 
+  function setupIndicatorGroupToggles() {
+    const groups = Array.from(document.querySelectorAll("details.indicator-group"));
+    if (!groups.length) return;
+
+    groups.forEach((group) => {
+      const toggle = group.querySelector("[data-indicator-group-toggle]");
+      const inputs = Array.from(
+        group.querySelectorAll('input[name="indicator"]')
+      );
+      if (!toggle || !inputs.length) return;
+
+      const syncToggleState = () => {
+        const checkedCount = inputs.filter((input) => input.checked).length;
+        toggle.checked = checkedCount === inputs.length;
+        toggle.indeterminate = checkedCount > 0 && checkedCount < inputs.length;
+      };
+
+      toggle.addEventListener("change", () => {
+        const shouldSelectAll = toggle.checked;
+        inputs.forEach((input) => {
+          input.checked = shouldSelectAll;
+        });
+        syncToggleState();
+      });
+
+      inputs.forEach((input) => {
+        input.addEventListener("change", syncToggleState);
+      });
+
+      syncToggleState();
+    });
+  }
+
+  setupIndicatorGroupToggles();
+
   function setupMapSearchToggle() {
     const container = document.querySelector(".map-search-control");
     if (!container) return;
@@ -647,6 +719,16 @@
       });
     };
 
+    const applyDimStyle = (markerLayer) => {
+      markerLayer.setStyle({
+        weight: 1,
+        color: "#64748b",
+        fillColor: "#cbd5e1",
+        fillOpacity: 0.2,
+        opacity: 0.25,
+      });
+    };
+
     const clearHotspotSelection = () => {
       hotspotButtons.forEach((button) => {
         button.classList.remove("is-active");
@@ -684,7 +766,7 @@
               markerLayer.bringToFront();
             }
           } else {
-            applyBaseStyle(markerLayer);
+            applyDimStyle(markerLayer);
           }
         });
       });
@@ -729,9 +811,9 @@
         onEachFeature: (feature, layer) => {
           const p = feature.properties;
           layer.bindPopup(
-            `<strong>${p.label || p.name}</strong><br>` +
+            `<strong>${popupLabel(p.label || p.name) || "-"}</strong><br>` +
             `District: ${p.district || "-"}<br>` +
-            `Environmental issue: ${p.indicator || "-"}<br>` +
+            `Environmental issue: ${indicatorLabel(p.indicator)}<br>` +
             `Severity: ${severityLabel(p.severity)}`
           );
         },
