@@ -797,7 +797,19 @@
       const indicatorColors = buildIndicatorColorMap(features);
       const layer = L.geoJSON(geojson, {
         pointToLayer: (feature, latlng) => {
+          const issueKey = normalizeIssueLabel(feature?.properties?.indicator);
           const issueColor = indicatorColor(indicatorColors, feature?.properties?.indicator);
+          if (issueKey === "borehole") {
+            return L.circleMarker(latlng, {
+              radius: 4,
+              pane: "bufferPane",
+              weight: 1,
+              color: "#0b1720",
+              opacity: 1,
+              fillColor: issueColor,
+              fillOpacity: 1,
+            });
+          }
           return L.circle(latlng, {
             radius: 100,
             pane: "bufferPane",
@@ -813,7 +825,7 @@
           layer.bindPopup(
             `<strong>${popupLabel(p.label || p.name) || "-"}</strong><br>` +
             `District: ${p.district || "-"}<br>` +
-            `Environmental issue: ${indicatorLabel(p.indicator)}<br>` +
+            `Environmental Hotspots: ${indicatorLabel(p.indicator)}<br>` +
             `Severity: ${severityLabel(p.severity)}`
           );
         },
