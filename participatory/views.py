@@ -15,6 +15,7 @@ INDICATOR_TYPO_FIXES = {
     "permenent": "permanent",
     "permanant": "permanent",
     "seassonal": "seasonal",
+    "confict": "conflict",
     "nutirent": "nutrient",
     "fertilty": "fertility",
     "grazzing": "grazing",

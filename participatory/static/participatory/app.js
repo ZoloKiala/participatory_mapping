@@ -392,6 +392,7 @@
       .replace("river bank", "riverbank")
       .replace("land tenure issues", "land tenure")
       .replace("bore hole", "borehole")
+      .replace("confict", "conflict")
       .replace("good condition contour bund", "cb plus")
       .replace("bad condition contour bund", "cb minus")
       .replace("good contour bund", "cb plus")
