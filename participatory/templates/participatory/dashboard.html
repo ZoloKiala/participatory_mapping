@@ -57,17 +57,33 @@
         </label>
 
         <fieldset>
-          <legend>Environmental Issues</legend>
+          <legend>Environmental Hotspots</legend>
           {% for group in indicator_option_groups %}
             <details class="indicator-group indicator-group--{{ group.key }}" data-indicator-group="{{ group.name }}">
               <summary class="muted">{{ group.name }}</summary>
+              <label class="indicator-option indicator-option--all" data-indicator-group="{{ group.name }}">
+                <input type="checkbox" data-indicator-group-toggle="{{ group.name }}">
+                All
+              </label>
               {% for indicator in group.items %}
                 <label class="indicator-option" data-indicator-group="{{ group.name }}">
                   <input type="checkbox" name="indicator" value="{{ indicator }}" {% if indicator in current.indicators %}checked{% endif %}>
                   {% if indicator == 'land tenure' %}
                     Land tenure issues
                   {% elif indicator == 'grazing pressure (high)' %}
-                    Grazing Pressure (High)
+                    High Grazing Pressure
+                  {% elif indicator == 'contour bund' %}
+                    Contour Bund (CB)
+                  {% elif indicator == 'cb plus' %}
+                    CB+ (Contour Bund in Good Condition)
+                  {% elif indicator == 'cb minus' %}
+                    CB- (Contour Bund in Bad Condition)
+                  {% elif indicator == 'dam' %}
+                    Dam (Priority)
+                  {% elif indicator == 'd plus' %}
+                    D+ (Dam in Good Condition)
+                  {% elif indicator == 'd minus' %}
+                    D- (Dam in Bad Condition)
                   {% else %}
                     {{ indicator|capfirst }}
                   {% endif %}
@@ -117,7 +133,19 @@
               {% if row.indicator == 'land tenure' %}
                 Land tenure issues
               {% elif row.indicator == 'grazing pressure (high)' %}
-                Grazing Pressure (High)
+                High Grazing Pressure
+              {% elif row.indicator == 'contour bund' %}
+                Contour Bund (CB)
+              {% elif row.indicator == 'cb plus' %}
+                CB+ (Contour Bund in Good Condition)
+              {% elif row.indicator == 'cb minus' %}
+                CB- (Contour Bund in Bad Condition)
+              {% elif row.indicator == 'dam' %}
+                Dam (Priority)
+              {% elif row.indicator == 'd plus' %}
+                D+ (Dam in Good Condition)
+              {% elif row.indicator == 'd minus' %}
+                D- (Dam in Bad Condition)
               {% else %}
                 {{ row.indicator|capfirst|default:'(blank)' }}
               {% endif %}
@@ -167,6 +195,6 @@
       indicatorApiUrl: "{% url 'selection_results' %}?{{ query_string|safe }}"
     };
   </script>
-  <script src="{% static 'participatory/app.js' %}?v=20260331-popup-severity-mapped"></script>
+  <script src="{% static 'participatory/app.js' %}?v=20260402-borehole-point-marker"></script>
 </body>
 </html>

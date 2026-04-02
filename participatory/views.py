@@ -16,6 +16,7 @@ INDICATOR_TYPO_FIXES = {
     "permanant": "permanent",
     "seassonal": "seasonal",
     "nutirent": "nutrient",
+    "fertilty": "fertility",
     "grazzing": "grazing",
     "gulley": "gully",
 }
@@ -26,23 +27,30 @@ INDICATOR_TOKEN_SINGULAR = {
     "wetlands": "wetland",
     "yields": "yield",
 }
+HIDDEN_INDICATORS = {"priority"}
+INTERVENTION_AREA_ITEMS = [
+    "contour bund",
+    "cb plus",
+    "cb minus",
+    "d plus",
+    "d minus",
+    "dam",
+]
 INDICATOR_CATEGORY_ORDER = [
-    "Water Resources Indicators",
-    "Soil Erosion Indicators",
-    "Productivity Indicators",
-    "Land and Ecosystem Indicators",
-    "Rangeland and Livestock Indicators",
-    "Socioeconomic and Governance Indicators",
-    "Other Indicators",
+    "Hydrological and Water Stress Hotspots",
+    "Soil Related Hotspots",
+    "Crop and Productivity Hotspots",
+    "Land  Use and Ecologcal Hotspots",
+    "Socio-economic Hotspots",
+    "Intervention Areas",
 ]
 INDICATOR_CATEGORY_KEYS = {
-    "Water Resources Indicators": "water",
-    "Soil Erosion Indicators": "soil",
-    "Productivity Indicators": "productivity",
-    "Land and Ecosystem Indicators": "ecosystem",
-    "Rangeland and Livestock Indicators": "rangeland",
-    "Socioeconomic and Governance Indicators": "governance",
-    "Other Indicators": "other",
+    "Hydrological and Water Stress Hotspots": "water",
+    "Soil Related Hotspots": "soil",
+    "Crop and Productivity Hotspots": "productivity",
+    "Land  Use and Ecologcal Hotspots": "ecosystem",
+    "Socio-economic Hotspots": "governance",
+    "Intervention Areas": "other",
 }
 
 
@@ -105,6 +113,16 @@ def _normalize_indicator(value: str) -> str:
     normalized = normalized.replace("wild life", "wildlife")
     normalized = normalized.replace("river bank", "riverbank")
     normalized = normalized.replace("bore hole", "borehole")
+    normalized = normalized.replace("good condition contour bund", "cb plus")
+    normalized = normalized.replace("bad condition contour bund", "cb minus")
+    normalized = normalized.replace("good contour bund", "cb plus")
+    normalized = normalized.replace("bad contour bund", "cb minus")
+    normalized = normalized.replace("good condition dam", "d plus")
+    normalized = normalized.replace("bad condition dam", "d minus")
+    normalized = normalized.replace("priority dam", "dam")
+    normalized = normalized.replace("yield decline", "yield loss")
+    normalized = normalized.replace("nutrient loss areas", "nutrient loss")
+    normalized = normalized.replace("nutrient loss area", "nutrient loss")
 
     normalized = normalized.replace("riverbank collapsed", "riverbank collapse")
     normalized = normalized.replace("seasonal stream", "stream seasonal")
@@ -128,7 +146,7 @@ def _indicator_groups() -> dict[str, set[str]]:
     )
     for indicator in indicators:
         key = _normalize_indicator(indicator)
-        if not key:
+        if not key or key in HIDDEN_INDICATORS:
             continue
         groups.setdefault(key, set()).add(indicator)
     return groups
@@ -137,7 +155,21 @@ def _indicator_groups() -> dict[str, set[str]]:
 def _indicator_category(indicator: str) -> str:
     value = (indicator or "").lower()
     if not value:
-        return "Other Indicators"
+        return "Intervention Areas"
+
+    if any(
+        token in value
+        for token in [
+            "contour bund",
+            "contour bunds",
+            "terrace",
+            "terraces",
+            "ridge",
+            "ridges",
+            "dam",
+        ]
+    ):
+        return "Intervention Areas"
 
     if any(
         token in value
@@ -157,13 +189,13 @@ def _indicator_category(indicator: str) -> str:
             "illegal abstraction",
         ]
     ):
-        return "Water Resources Indicators"
+        return "Hydrological and Water Stress Hotspots"
 
     if any(token in value for token in ["erosion", "gully", "sedimentation", "terraces", "ridges"]):
-        return "Soil Erosion Indicators"
+        return "Soil Related Hotspots"
 
     if any(token in value for token in ["yield", "fertility", "nutrient"]):
-        return "Productivity Indicators"
+        return "Crop and Productivity Hotspots"
 
     if any(
         token in value
@@ -176,21 +208,23 @@ def _indicator_category(indicator: str) -> str:
             "deforestation",
         ]
     ):
-        return "Land and Ecosystem Indicators"
+        return "Land  Use and Ecologcal Hotspots"
 
     if any(token in value for token in ["grazing", "pasture"]):
-        return "Rangeland and Livestock Indicators"
+        return "Crop and Productivity Hotspots"
 
     if any(token in value for token in ["priority", "women barriers", "land tenure"]):
-        return "Socioeconomic and Governance Indicators"
+        return "Socio-economic Hotspots"
 
-    return "Other Indicators"
+    return "Intervention Areas"
 
 
 def _group_indicators_by_category(indicators: list[str]) -> list[dict[str, object]]:
     grouped: dict[str, list[str]] = {category: [] for category in INDICATOR_CATEGORY_ORDER}
     for indicator in indicators:
         grouped[_indicator_category(indicator)].append(indicator)
+
+    grouped["Intervention Areas"] = INTERVENTION_AREA_ITEMS.copy()
 
     return [
         {
@@ -207,7 +241,7 @@ def _canonical_indicator_counts(queryset, limit: int = 15) -> list[dict[str, obj
     counter: Counter[str] = Counter()
     for indicator in queryset.exclude(indicator="").values_list("indicator", flat=True):
         normalized = _normalize_indicator(indicator)
-        if normalized:
+        if normalized and normalized not in HIDDEN_INDICATORS:
             counter[normalized] += 1
 
     rows = []
