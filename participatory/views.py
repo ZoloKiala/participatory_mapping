@@ -26,9 +26,10 @@ INDICATOR_TOKEN_SINGULAR = {
     "disputes": "dispute",
     "corridors": "corridor",
     "wetlands": "wetland",
+    "rivers": "river",
     "yields": "yield",
 }
-HIDDEN_INDICATORS = {"priority"}
+HIDDEN_INDICATORS = {"priority", "spring"}
 INTERVENTION_AREA_ITEMS = [
     "contour bund",
     "cb plus",
@@ -121,14 +122,34 @@ def _normalize_indicator(value: str) -> str:
     normalized = normalized.replace("good condition dam", "d plus")
     normalized = normalized.replace("bad condition dam", "d minus")
     normalized = normalized.replace("priority dam", "dam")
-    normalized = normalized.replace("yield decline", "yield loss")
+    normalized = normalized.replace("forest decline", "forest loss")
+    normalized = normalized.replace("pollinator habitats", "pollinators")
+    normalized = normalized.replace("pollinator habitat", "pollinators")
+    if normalized in {
+        "deforestation sacred forest",
+        "sacred forest reduction",
+    }:
+        normalized = "sacred forest reduction"
+    if normalized in {"yield", "yields", "yield decline", "yield loss"}:
+        normalized = "yield loss"
     normalized = normalized.replace("nutrient loss areas", "nutrient loss")
     normalized = normalized.replace("nutrient loss area", "nutrient loss")
 
     normalized = normalized.replace("riverbank collapsed", "riverbank collapse")
-    normalized = normalized.replace("seasonal stream", "stream seasonal")
+    normalized = normalized.replace("stream seasonal", "seasonal stream")
+    normalized = normalized.replace("stream permanent", "permanent stream")
+    normalized = normalized.replace("spring permanent", "permanent spring")
+    if normalized in {
+        "women barriers",
+        "women barriers to accessing land water and grazing sites",
+    }:
+        normalized = "women barriers to accessing land water and grazing sites"
+    if normalized in {"water conflict", "water conflicts", "water conflict area"}:
+        normalized = "water conflict area"
     if normalized == "flooding":
         normalized = "flood"
+    if normalized == "women barriers to accessing land water and grazing sites":
+        return normalized
     if "grazing" in normalized:
         return "grazing pressure (high)"
 
@@ -157,6 +178,17 @@ def _indicator_category(indicator: str) -> str:
     value = (indicator or "").lower()
     if not value:
         return "Intervention Areas"
+
+    if any(
+        token in value
+        for token in [
+            "priority",
+            "women barriers",
+            "women barriers to accessing land water and grazing sites",
+            "land tenure",
+        ]
+    ):
+        return "Socio-economic Hotspots"
 
     if any(
         token in value
@@ -213,9 +245,6 @@ def _indicator_category(indicator: str) -> str:
 
     if any(token in value for token in ["grazing", "pasture"]):
         return "Crop and Productivity Hotspots"
-
-    if any(token in value for token in ["priority", "women barriers", "land tenure"]):
-        return "Socio-economic Hotspots"
 
     return "Intervention Areas"
 

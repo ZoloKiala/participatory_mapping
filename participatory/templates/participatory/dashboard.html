@@ -79,11 +79,13 @@
                   {% elif indicator == 'cb minus' %}
                     CB- (Contour Bund in Bad Condition)
                   {% elif indicator == 'dam' %}
-                    Dam (Priority)
+                    High potential damming point
                   {% elif indicator == 'd plus' %}
                     D+ (Dam in Good Condition)
                   {% elif indicator == 'd minus' %}
                     D- (Dam in Bad Condition)
+                  {% elif indicator == 'women barriers to accessing land water and grazing sites' %}
+                    Women barriers to accessing land, water, and grazing sites
                   {% else %}
                     {{ indicator|capfirst }}
                   {% endif %}
@@ -107,7 +109,7 @@
           <label>
             <select name="severity">
               <option value="" {% if not current.severity %}selected{% endif %}>All</option>
-              <option value="1" {% if current.severity == '1' %}selected{% endif %}>1 - Low severe</option>
+              <option value="1" {% if current.severity == '1' %}selected{% endif %}>1 - Low severity</option>
               <option value="3" {% if current.severity == '3' %}selected{% endif %}>3 - Moderate severity</option>
               <option value="5" {% if current.severity == '5' %}selected{% endif %}>5 - High severity</option>
             </select>
@@ -141,11 +143,13 @@
               {% elif row.indicator == 'cb minus' %}
                 CB- (Contour Bund in Bad Condition)
               {% elif row.indicator == 'dam' %}
-                Dam (Priority)
+                High potential damming point
               {% elif row.indicator == 'd plus' %}
                 D+ (Dam in Good Condition)
               {% elif row.indicator == 'd minus' %}
                 D- (Dam in Bad Condition)
+              {% elif row.indicator == 'women barriers to accessing land water and grazing sites' %}
+                Women barriers to accessing land, water, and grazing sites
               {% else %}
                 {{ row.indicator|capfirst|default:'(blank)' }}
               {% endif %}

@@ -360,10 +360,13 @@
     if (normalized === "contour bund") return "Contour Bund (CB)";
     if (normalized === "cb plus") return "CB+ (Contour Bund in Good Condition)";
     if (normalized === "cb minus") return "CB- (Contour Bund in Bad Condition)";
-    if (normalized === "dam") return "Dam (Priority)";
+    if (normalized === "dam") return "High potential damming point";
     if (normalized === "d plus") return "D+ (Dam in Good Condition)";
     if (normalized === "d minus") return "D- (Dam in Bad Condition)";
     if (normalized === "land tenure") return "Land tenure issues";
+    if (normalized === "women barriers to accessing land water and grazing sites") {
+      return "Women barriers to accessing land, water, and grazing sites";
+    }
     return normalized.charAt(0).toUpperCase() + normalized.slice(1);
   }
 
@@ -404,16 +407,55 @@
       .replace("priority dam", "dam")
       .replace("d+", "d plus")
       .replace("d-", "d minus")
+      .replace("forest decline", "forest loss")
+      .replace("pollinator habitats", "pollinators")
+      .replace("pollinator habitat", "pollinators")
       .replace("fertilty", "fertility")
-      .replace("yield decline", "yield loss")
       .replace("nutrient loss areas", "nutrient loss")
       .replace("nutrient loss area", "nutrient loss")
       .replace("riverbank collapsed", "riverbank collapse")
-      .replace("seasonal stream", "stream seasonal")
+      .replace("stream seasonal", "seasonal stream")
+      .replace("stream permanent", "permanent stream")
+      .replace("spring permanent", "permanent spring")
       .replace("gulley", "gully");
+
+    if (
+      normalized === "deforestation sacred forest" ||
+      normalized === "sacred forest reduction"
+    ) {
+      normalized = "sacred forest reduction";
+    }
+
+    if (
+      normalized === "women barriers" ||
+      normalized === "women barriers to accessing land water and grazing sites"
+    ) {
+      normalized = "women barriers to accessing land water and grazing sites";
+    }
+
+    if (
+      normalized === "yield" ||
+      normalized === "yields" ||
+      normalized === "yield decline" ||
+      normalized === "yield loss"
+    ) {
+      normalized = "yield loss";
+    }
+
+    if (
+      normalized === "water conflict" ||
+      normalized === "water conflicts" ||
+      normalized === "water conflict area"
+    ) {
+      normalized = "water conflict area";
+    }
 
     if (normalized === "flooding") {
       normalized = "flood";
+    }
+
+    if (normalized === "women barriers to accessing land water and grazing sites") {
+      return normalized;
     }
 
     if (normalized.includes("grazing")) {
@@ -426,6 +468,7 @@
       disputes: "dispute",
       corridors: "corridor",
       wetlands: "wetland",
+      rivers: "river",
       yields: "yield",
     };
     if (parts.length) {
@@ -439,7 +482,9 @@
   function buildIndicatorColorMap(features) {
     const canonicalKeys = new Set();
     features.forEach((feature) => {
-      const key = normalizeIssueLabel(indicatorLabel(feature?.properties?.indicator));
+      const rawIndicator = feature?.properties?.indicator;
+      if (!normalizeIssueLabel(rawIndicator)) return;
+      const key = normalizeIssueLabel(indicatorLabel(rawIndicator));
       if (key) canonicalKeys.add(key);
     });
 
@@ -464,9 +509,9 @@
     if (value === null || value === undefined || value === "") return "-";
     const numeric = Number(value);
     if (Number.isNaN(numeric)) return `${value}`;
-    if (numeric <= 1) return `Low (${numeric})`;
-    if (numeric <= 3) return `Moderate (${numeric})`;
-    return `High (${numeric})`;
+    if (numeric <= 1) return "1 - Low severity";
+    if (numeric <= 3) return "3 - Moderate severity";
+    return "5 - High severity";
   }
 
   function addLegendControl(indicatorColors) {
