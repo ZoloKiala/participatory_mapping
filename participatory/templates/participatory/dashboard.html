@@ -70,6 +70,8 @@
                   <input type="checkbox" name="indicator" value="{{ indicator }}" {% if indicator in current.indicators %}checked{% endif %}>
                   {% if indicator == 'land tenure' %}
                     Land tenure issues
+                  {% elif indicator == 'pollinators' %}
+                    Pollinator habitat loss
                   {% elif indicator == 'grazing pressure (high)' %}
                     High Grazing Pressure
                   {% elif indicator == 'contour bund' %}
@@ -134,6 +136,8 @@
             <button type="button" class="hotspot-link hotspot-item" aria-pressed="false">
               {% if row.indicator == 'land tenure' %}
                 Land tenure issues
+              {% elif row.indicator == 'pollinators' %}
+                Pollinator habitat loss
               {% elif row.indicator == 'grazing pressure (high)' %}
                 High Grazing Pressure
               {% elif row.indicator == 'contour bund' %}
@@ -199,6 +203,6 @@
       indicatorApiUrl: "{% url 'selection_results' %}?{{ query_string|safe }}"
     };
   </script>
-  <script src="{% static 'participatory/app.js' %}?v=20260402-water-conflict-typo-merge"></script>
+  <script src="{% static 'participatory/app.js' %}?v=20260407-pollinator-habitat-loss-label"></script>
 </body>
 </html>

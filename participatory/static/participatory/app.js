@@ -364,6 +364,7 @@
     if (normalized === "d plus") return "D+ (Dam in Good Condition)";
     if (normalized === "d minus") return "D- (Dam in Bad Condition)";
     if (normalized === "land tenure") return "Land tenure issues";
+    if (normalized === "pollinators") return "Pollinator habitat loss";
     if (normalized === "women barriers to accessing land water and grazing sites") {
       return "Women barriers to accessing land, water, and grazing sites";
     }
@@ -410,6 +411,8 @@
       .replace("forest decline", "forest loss")
       .replace("pollinator habitats", "pollinators")
       .replace("pollinator habitat", "pollinators")
+      .replace("pollinator habitat losses", "pollinators")
+      .replace("pollinator habitat loss", "pollinators")
       .replace("fertilty", "fertility")
       .replace("nutrient loss areas", "nutrient loss")
       .replace("nutrient loss area", "nutrient loss")
