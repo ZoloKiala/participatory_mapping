@@ -31,7 +31,6 @@ Open:
 - On Railway, set:
   - `DEBUG=false`
   - `ALLOWED_HOSTS=participatorymapping-production.up.railway.app,.up.railway.app`
-  - `LOAD_PRELOADED_LOCATIONS=1` only if you want to import `preloaded_locations.csv` during startup
 
 ## Railway Deploy Notes
 
@@ -39,8 +38,9 @@ Open:
 - The web process runs:
   - `python manage.py collectstatic --noinput`
   - `python manage.py migrate --noinput`
-  - optional CSV preload when `LOAD_PRELOADED_LOCATIONS=1`
+  - CSV preload with `python manage.py load_locations --if-empty`
   - `python -m gunicorn pgis_project.wsgi:application --bind 0.0.0.0:${PORT:-8000}`
+- The CSV preload is idempotent at startup: it imports only when the `Location` table is empty.
 - If the app still fails on Railway, check the latest deploy logs first. The most likely remaining issues are missing environment variables or a failed database attachment.
 
 ## API Endpoints

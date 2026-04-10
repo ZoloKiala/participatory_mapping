@@ -24,11 +24,20 @@ class Command(BaseCommand):
             action="store_true",
             help="Delete existing locations before import.",
         )
+        parser.add_argument(
+            "--if-empty",
+            action="store_true",
+            help="Import rows only when the Location table is empty.",
+        )
 
     def handle(self, *args, **options):
         csv_path = Path(options["csv"]).resolve()
         if not csv_path.exists():
             raise CommandError(f"CSV not found: {csv_path}")
+
+        if options["if_empty"] and Location.objects.exists():
+            self.stdout.write(self.style.WARNING("Skipped import because locations already exist."))
+            return
 
         if options["replace"]:
             deleted, _ = Location.objects.all().delete()
