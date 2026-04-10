@@ -1,1 +1,1 @@
-web: python manage.py collectstatic --noinput && python manage.py migrate --noinput && if [ -f preloaded_locations.csv ]; then python manage.py load_locations; fi && gunicorn pgis_project.wsgi:application --bind 0.0.0.0:$PORT
+web: python manage.py collectstatic --noinput && python manage.py migrate --noinput && if [ "${LOAD_PRELOADED_LOCATIONS:-0}" = "1" ] && [ -f preloaded_locations.csv ]; then python manage.py load_locations; fi && python -m gunicorn pgis_project.wsgi:application --bind 0.0.0.0:${PORT:-8000}
