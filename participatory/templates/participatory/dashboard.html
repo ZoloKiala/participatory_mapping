@@ -15,7 +15,36 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260415-location-zoom-button">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Flex:opsz,wght@8..144,400;8..144,500;8..144,700&family=Space+Grotesk:wght@500;700&display=swap"
+  >
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+  >
+
+  <script type="importmap">
+  {
+    "imports": {
+      "@material/web/": "https://esm.run/@material/web/",
+      "lit": "https://esm.run/lit",
+      "lit/": "https://esm.run/lit/",
+      "tslib": "https://esm.run/tslib"
+    }
+  }
+  </script>
+  <script type="module">
+    import '@material/web/all.js';
+    import { styles as typescaleStyles } from '@material/web/typography/md-typescale-styles.js';
+    if (typescaleStyles && typescaleStyles.styleSheet) {
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, typescaleStyles.styleSheet];
+    }
+  </script>
+
+  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260415-m3">
 </head>
 <body>
   <div id="app-loader" class="app-loader" role="status" aria-live="polite" aria-label="Loading dashboard data">
@@ -52,26 +81,29 @@
           <h2>Filter hotspots</h2>
           <p>Refine the dashboard by district, hotspot type, participant group, and severity.</p>
         </div>
-        <label><strong>District</strong>
-          <select name="district">
+        <div class="field-block">
+          <md-outlined-select name="district" label="District" class="field-full">
             {% for district in districts %}
-              <option value="{{ district }}" {% if current.district == district %}selected{% endif %}>{{ district }}</option>
+              <md-select-option value="{{ district }}" {% if current.district == district %}selected{% endif %}>
+                <div slot="headline">{{ district }}</div>
+              </md-select-option>
             {% endfor %}
-          </select>
-        </label>
+          </md-outlined-select>
+        </div>
 
-        <fieldset>
+        <fieldset class="m3-fieldset">
           <legend>Environmental Hotspots</legend>
           {% for group in indicator_option_groups %}
             <details class="indicator-group indicator-group--{{ group.key }}" data-indicator-group="{{ group.name }}">
               <summary class="muted">{{ group.name }}</summary>
               <label class="indicator-option indicator-option--all" data-indicator-group="{{ group.name }}">
-                <input type="checkbox" data-indicator-group-toggle="{{ group.name }}">
-                All
+                <md-checkbox touch-target="wrapper" data-indicator-group-toggle="{{ group.name }}"></md-checkbox>
+                <span>All</span>
               </label>
               {% for indicator in group.items %}
                 <label class="indicator-option" data-indicator-group="{{ group.name }}">
-                  <input type="checkbox" name="indicator" value="{{ indicator }}" {% if indicator in current.indicators %}checked{% endif %}>
+                  <md-checkbox touch-target="wrapper" name="indicator" value="{{ indicator }}" {% if indicator in current.indicators %}checked{% endif %}></md-checkbox>
+                  <span>
                   {% if indicator == 'land tenure' %}
                     Land tenure issues
                   {% elif indicator == 'pollinators' %}
@@ -95,48 +127,77 @@
                   {% else %}
                     {{ indicator|capfirst }}
                   {% endif %}
+                  </span>
                 </label>
               {% endfor %}
             </details>
           {% endfor %}
         </fieldset>
 
-        <label><strong>Category</strong>
-          <select name="category" multiple size="5">
-            <option value="" {% if not current.categories %}selected{% endif %}>All</option>
+        <fieldset class="m3-fieldset category-fieldset">
+          <legend>Category</legend>
+          <p class="field-helper">Select one or more participant groups. Leave empty for all.</p>
+          <div class="category-options">
             {% for category in categories %}
-              <option value="{{ category.value }}" {% if category.value in current.categories %}selected{% endif %}>{{ category.label }}</option>
+              <label class="category-option">
+                <md-checkbox
+                  touch-target="wrapper"
+                  name="category"
+                  value="{{ category.value }}"
+                  {% if category.value in current.categories %}checked{% endif %}
+                ></md-checkbox>
+                <span>{{ category.label }}</span>
+              </label>
             {% endfor %}
-          </select>
-        </label>
-
-        <fieldset>
-          <legend>Severity</legend>
-          <label>
-            <select name="severity">
-              <option value="" {% if not current.severity %}selected{% endif %}>All</option>
-              <option value="1" {% if current.severity == '1' %}selected{% endif %}>1 - Low severity</option>
-              <option value="3" {% if current.severity == '3' %}selected{% endif %}>3 - Moderate severity</option>
-              <option value="5" {% if current.severity == '5' %}selected{% endif %}>5 - High severity</option>
-            </select>
-          </label>
+          </div>
         </fieldset>
 
+        <div class="field-block">
+          <md-outlined-select name="severity" label="Severity" class="field-full">
+            <md-select-option value="" {% if not current.severity %}selected{% endif %}>
+              <div slot="headline">All</div>
+            </md-select-option>
+            <md-select-option value="1" {% if current.severity == '1' %}selected{% endif %}>
+              <div slot="headline">1 &mdash; Low severity</div>
+            </md-select-option>
+            <md-select-option value="3" {% if current.severity == '3' %}selected{% endif %}>
+              <div slot="headline">3 &mdash; Moderate severity</div>
+            </md-select-option>
+            <md-select-option value="5" {% if current.severity == '5' %}selected{% endif %}>
+              <div slot="headline">5 &mdash; High severity</div>
+            </md-select-option>
+          </md-outlined-select>
+        </div>
+
         <div class="filter-actions">
-          <button type="submit" class="apply-btn">
-            <span class="apply-btn-label" data-default="Apply Filters" data-loading="Applying...">Apply Filters</span>
-            <span class="apply-btn-spinner" aria-hidden="true"></span>
-          </button>
-          <a href="/" class="reset-btn reset-icon-btn" data-skip-loader="1" aria-label="Reset filters" title="Reset filters">
-            ↺
-          </a>
+          <md-filled-button
+            type="submit"
+            class="apply-btn"
+            data-default="Apply Filters"
+            data-loading="Applying..."
+          >
+            <md-icon slot="icon" aria-hidden="true">tune</md-icon>
+            Apply Filters
+          </md-filled-button>
+          <md-outlined-icon-button
+            href="/"
+            data-skip-loader="1"
+            aria-label="Reset filters"
+            title="Reset filters"
+            class="reset-btn"
+          >
+            <md-icon>restart_alt</md-icon>
+          </md-outlined-icon-button>
         </div>
       </form>
 
       <div class="panel-section">
         <div class="section-head">
           <h2>Identified Environmental Hotspots</h2>
-          <button type="button" class="ghost-btn" id="clear-hotspot-focus">Clear focus</button>
+          <md-text-button type="button" class="ghost-btn" id="clear-hotspot-focus">
+            <md-icon slot="icon" aria-hidden="true">filter_alt_off</md-icon>
+            Clear focus
+          </md-text-button>
         </div>
         <ul class="top-list">
           {% for row in indicator_counts %}
@@ -190,16 +251,17 @@
           </p>
         </div>
         <div class="search-card">
-          <label><strong>Search labels</strong>
-            <input
-              type="text"
-              name="q"
-              form="filters-form"
-              value="{{ current.q }}"
-              aria-label="Search label"
-              placeholder="e.g. flood, erosion"
-            >
-          </label>
+          <md-outlined-text-field
+            type="search"
+            name="q"
+            form="filters-form"
+            value="{{ current.q }}"
+            label="Search labels"
+            placeholder="e.g. flood, erosion"
+            class="field-full"
+          >
+            <md-icon slot="leading-icon">search</md-icon>
+          </md-outlined-text-field>
           <p class="search-note">Search applies when you submit the filters.</p>
         </div>
       </header>
@@ -334,6 +396,6 @@
       indicatorApiUrl: "{% url 'selection_results' %}?{{ query_string|safe }}"
     };
   </script>
-  <script src="{% static 'participatory/app.js' %}?v=20260415-location-zoom-button"></script>
+  <script src="{% static 'participatory/app.js' %}?v=20260415-m3"></script>
 </body>
 </html>
