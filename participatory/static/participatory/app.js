@@ -963,9 +963,18 @@
       if (applyBtn) {
         applyBtn.classList.add("is-loading");
         applyBtn.disabled = true;
-        const label = applyBtn.querySelector(".apply-btn-label");
-        if (label && label.dataset.loading) {
-          label.textContent = label.dataset.loading;
+        const loadingLabel = applyBtn.dataset.loading;
+        if (loadingLabel) {
+          // MWC buttons render slotted text from their light-DOM textContent.
+          // Walk the light-DOM children and replace the first text node.
+          const textNode = Array.from(applyBtn.childNodes).find(
+            (node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length
+          );
+          if (textNode) {
+            textNode.textContent = " " + loadingLabel + " ";
+          } else {
+            applyBtn.append(document.createTextNode(" " + loadingLabel + " "));
+          }
         }
       }
 
@@ -984,8 +993,8 @@
     if (!groups.length) return;
 
     const selectedIndicators = Array.from(
-      document.querySelectorAll('input[name="indicator"]:checked')
-    );
+      document.querySelectorAll('md-checkbox[name="indicator"]')
+    ).filter((cb) => cb.checked);
     if (selectedIndicators.length) {
       const selectedGroups = new Set();
       selectedIndicators.forEach((input) => {
@@ -1000,9 +1009,9 @@
     groups.forEach((group) => {
       group.addEventListener("toggle", () => {
         if (!group.open) return;
-        const hasSelectedIndicators = !!document.querySelector(
-          'input[name="indicator"]:checked'
-        );
+        const hasSelectedIndicators = Array.from(
+          document.querySelectorAll('md-checkbox[name="indicator"]')
+        ).some((cb) => cb.checked);
         if (hasSelectedIndicators) return;
         groups.forEach((otherGroup) => {
           if (otherGroup !== group) {
@@ -1019,7 +1028,7 @@
 
     groups.forEach((group) => {
       const toggle = group.querySelector("[data-indicator-group-toggle]");
-      const inputs = Array.from(group.querySelectorAll('input[name="indicator"]'));
+      const inputs = Array.from(group.querySelectorAll('md-checkbox[name="indicator"]'));
       if (!toggle || !inputs.length) return;
 
       const syncToggleState = () => {
@@ -1045,7 +1054,7 @@
   }
 
   function setupSkipLoaderLinks() {
-    document.querySelectorAll('a[data-skip-loader="1"]').forEach((link) => {
+    document.querySelectorAll('[data-skip-loader="1"]').forEach((link) => {
       link.addEventListener("click", () => {
         try {
           window.sessionStorage.setItem("pgis_skip_loader_once", "1");
