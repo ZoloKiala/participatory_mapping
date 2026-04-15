@@ -128,10 +128,12 @@ def _normalize_indicator(value: str) -> str:
     normalized = normalized.replace("pollinator habitat losses", "pollinators")
     normalized = normalized.replace("pollinator habitat loss", "pollinators")
     if normalized in {
+        "seasonal forest",
+        "forest seasonal",
         "deforestation sacred forest",
         "sacred forest reduction",
     }:
-        normalized = "sacred forest reduction"
+        normalized = "sacred forest"
     if normalized in {"yield", "yields", "yield decline", "yield loss"}:
         normalized = "yield loss"
     normalized = normalized.replace("nutrient loss areas", "nutrient loss")
