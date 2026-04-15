@@ -3,13 +3,11 @@
   if (!skipLoader) {
     document.body.classList.add("is-loading");
   }
+
   const appLoader = document.getElementById("app-loader");
-  const pointsLoader = document.getElementById("points-loader");
-  if (skipLoader && appLoader) {
-    appLoader.classList.add("is-hidden");
-  }
   const loaderShownAt = Date.now();
-  const minLoaderMs = 1800;
+  const minLoaderMs = 1200;
+
   function hideLoader() {
     if (!appLoader) return;
     const elapsed = Date.now() - loaderShownAt;
@@ -20,323 +18,42 @@
     }, wait);
   }
 
-  function hidePointsLoader() {
-    if (pointsLoader) {
-      pointsLoader.classList.add("is-hidden");
-    }
-  }
-
-  // Failsafe: never leave the app blocked by the loader.
   window.setTimeout(hideLoader, 7000);
 
-  const map = L.map("map").setView([-14.6, 34.9], 7);
-  let legendControl = null;
-  map.createPane("bufferPane");
-  map.getPane("bufferPane").style.zIndex = "350";
-  window.addEventListener("load", () => map.invalidateSize({ pan: false }));
-  window.addEventListener("resize", () => map.invalidateSize({ pan: false }));
-  L.control.scale({ position: "bottomleft" }).addTo(map);
+  const state = {
+    rows: [],
+    votes: [],
+    activeIndicator: "",
+    activeLocationId: "",
+    tablePage: 1,
+    indicatorColors: new Map(),
+  };
 
-  const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap contributors",
-    crossOrigin: true,
-  });
+  const tableRowsPerPage = 8;
 
-  const osmHumanitarian = L.tileLayer(
-    "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
-    {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors, Humanitarian style",
-      crossOrigin: true,
-    }
-  );
+  const chartIds = {
+    geo: "geo-chart",
+    indicator: "indicator-chart",
+    severity: "severity-chart",
+    category: "category-chart",
+    votes: "votes-chart",
+  };
 
-  const esriImagery = L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    {
-      maxZoom: 19,
-      attribution: "Tiles &copy; Esri",
-      crossOrigin: true,
-    }
-  );
+  const categoryColors = {
+    "Hydrological and Water Stress Hotspots": "#1d7b5f",
+    "Soil Related Hotspots": "#ef7f45",
+    "Crop and Productivity Hotspots": "#d9485f",
+    "Land  Use and Ecologcal Hotspots": "#7b5af0",
+    "Socio-economic Hotspots": "#0f4c81",
+    "Intervention Areas": "#b78b28",
+  };
 
-  const cartoLabels = L.tileLayer(
-    "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png",
-    {
-      maxZoom: 20,
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-      crossOrigin: true,
-    }
-  );
-
-  const openTopoMap = L.tileLayer(
-    "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-    {
-      maxZoom: 19,
-      attribution:
-        "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap",
-      crossOrigin: true,
-    }
-  );
-
-  const hybrid = L.layerGroup([esriImagery, cartoLabels]);
-
-  hybrid.addTo(map);
-
-  const failureCounts = new WeakMap();
-  function registerBasemapFallback(tileLayer, activeLayer) {
-    tileLayer.on("tileerror", () => {
-      const failures = (failureCounts.get(tileLayer) || 0) + 1;
-      failureCounts.set(tileLayer, failures);
-      if (failures >= 3 && activeLayer !== osm && map.hasLayer(activeLayer)) {
-        map.removeLayer(activeLayer);
-        osm.addTo(map);
-      }
-    });
-  }
-
-  registerBasemapFallback(osmHumanitarian, osmHumanitarian);
-  registerBasemapFallback(openTopoMap, openTopoMap);
-  registerBasemapFallback(esriImagery, hybrid);
-  registerBasemapFallback(cartoLabels, hybrid);
-
-  L.control
-    .layers(
-      {
-        "Google Hybrid (Satellite + Labels)": hybrid,
-        "OpenStreetMap": osm,
-        "OSM Humanitarian": osmHumanitarian,
-        "OpenTopoMap": openTopoMap,
-      },
-      null,
-      { position: "topright" }
-    )
-    .addTo(map);
-
-  function setupSidebarToggle() {
-    const layout = document.querySelector(".layout");
-    if (!layout) return;
-
-    const storageKey = "pgis_sidebar_collapsed";
-    let button;
-    const applyState = (collapsed) => {
-      layout.classList.toggle("panel-collapsed", collapsed);
-      if (button) {
-        button.setAttribute("aria-label", collapsed ? "Show sidebar" : "Hide sidebar");
-        button.setAttribute("title", collapsed ? "Show sidebar" : "Hide sidebar");
-      }
-      map.invalidateSize({ pan: false });
-    };
-
-    const SidebarToggleControl = L.Control.extend({
-      options: { position: "topleft" },
-      onAdd() {
-        const container = L.DomUtil.create("div", "leaflet-control sidebar-toggle-control");
-        const bar = L.DomUtil.create("div", "leaflet-bar", container);
-        button = L.DomUtil.create("a", "sidebar-map-toggle", bar);
-        button.href = "#";
-        button.setAttribute("role", "button");
-        button.setAttribute("aria-label", "Hide sidebar");
-        button.setAttribute("title", "Hide sidebar");
-
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.on(button, "click", (event) => {
-          L.DomEvent.preventDefault(event);
-          const collapsed = !layout.classList.contains("panel-collapsed");
-          applyState(collapsed);
-          window.localStorage.setItem(storageKey, collapsed ? "1" : "0");
-        });
-        return container;
-      },
-    });
-
-    map.addControl(new SidebarToggleControl());
-
-    const savedCollapsed = window.localStorage.getItem(storageKey) === "1";
-    applyState(savedCollapsed);
-  }
-
-  function setupMeasureTool() {
-    const mapContainer = map.getContainer();
-    let isMeasuring = false;
-    const measurePoints = [];
-    const measureLayer = L.layerGroup().addTo(map);
-    let toggleButton = null;
-    let clearButton = null;
-
-    function formatDistance(meters) {
-      if (meters >= 1000) {
-        return `${(meters / 1000).toFixed(2)} km`;
-      }
-      return `${Math.round(meters)} m`;
-    }
-
-    function formatArea(squareMeters) {
-      if (squareMeters >= 1000000) {
-        return `${(squareMeters / 1000000).toFixed(2)} km²`;
-      }
-      if (squareMeters >= 10000) {
-        return `${(squareMeters / 10000).toFixed(2)} ha`;
-      }
-      return `${Math.round(squareMeters)} m²`;
-    }
-
-    function totalDistance(points) {
-      let meters = 0;
-      for (let i = 1; i < points.length; i += 1) {
-        meters += points[i - 1].distanceTo(points[i]);
-      }
-      return meters;
-    }
-
-    function geodesicArea(points) {
-      if (points.length < 3) return 0;
-      const d2r = Math.PI / 180;
-      const radius = 6378137.0;
-      let area = 0;
-
-      for (let i = 0; i < points.length; i += 1) {
-        const p1 = points[i];
-        const p2 = points[(i + 1) % points.length];
-        area +=
-          ((p2.lng - p1.lng) * d2r) *
-          (2 + Math.sin(p1.lat * d2r) + Math.sin(p2.lat * d2r));
-      }
-
-      return Math.abs((area * radius * radius) / 2.0);
-    }
-
-    function updateButtons() {
-      if (toggleButton) {
-        toggleButton.classList.toggle("is-active", isMeasuring);
-        toggleButton.setAttribute(
-          "title",
-          isMeasuring ? "Stop measuring" : "Start measuring"
-        );
-        toggleButton.setAttribute(
-          "aria-label",
-          isMeasuring ? "Stop measuring" : "Start measuring"
-        );
-      }
-      if (clearButton) {
-        const hasPoints = measurePoints.length > 0;
-        clearButton.classList.toggle("is-disabled", !hasPoints);
-        clearButton.setAttribute("aria-disabled", hasPoints ? "false" : "true");
-      }
-      mapContainer.classList.toggle("is-measuring", isMeasuring);
-    }
-
-    function renderMeasurement() {
-      measureLayer.clearLayers();
-      let polygonLayer = null;
-
-      measurePoints.forEach((point) => {
-        L.circleMarker(point, {
-          radius: 5,
-          color: "#0b1720",
-          weight: 1,
-          fillColor: "#f97316",
-          fillOpacity: 1,
-          opacity: 1,
-        }).addTo(measureLayer);
-      });
-
-      if (measurePoints.length >= 2) {
-        L.polyline(measurePoints, {
-          color: "#f97316",
-          weight: 3,
-          opacity: 1,
-          dashArray: "9 6",
-        }).addTo(measureLayer);
-
-        let distanceMeters = totalDistance(measurePoints);
-        let distanceLabel = formatDistance(distanceMeters);
-
-        if (measurePoints.length >= 3) {
-          polygonLayer = L.polygon(measurePoints, {
-            color: "#f97316",
-            weight: 1,
-            fillColor: "#f97316",
-            fillOpacity: 0.12,
-            opacity: 0.65,
-          }).addTo(measureLayer);
-          distanceMeters += measurePoints[measurePoints.length - 1].distanceTo(measurePoints[0]);
-          distanceLabel = `Perimeter: ${formatDistance(distanceMeters)}`;
-        }
-
-        const endPoint = measurePoints[measurePoints.length - 1];
-        L.marker(endPoint, {
-          interactive: false,
-          icon: L.divIcon({
-            className: "measure-distance-label",
-            html: `<span>${distanceLabel}</span>`,
-          }),
-        }).addTo(measureLayer);
-
-        if (polygonLayer) {
-          const areaMeters = geodesicArea(measurePoints);
-          const center = polygonLayer.getBounds().getCenter();
-          L.marker(center, {
-            interactive: false,
-            icon: L.divIcon({
-              className: "measure-area-label",
-              html: `<span>Area: ${formatArea(areaMeters)}</span>`,
-            }),
-          }).addTo(measureLayer);
-        }
-      }
-
-      updateButtons();
-    }
-
-    function clearMeasurement() {
-      measurePoints.length = 0;
-      measureLayer.clearLayers();
-      updateButtons();
-    }
-
-    const MeasureControl = L.Control.extend({
-      options: { position: "topleft" },
-      onAdd() {
-        const container = L.DomUtil.create("div", "leaflet-control measure-control");
-        const bar = L.DomUtil.create("div", "leaflet-bar", container);
-
-        toggleButton = L.DomUtil.create("a", "measure-map-toggle", bar);
-        toggleButton.href = "#";
-        toggleButton.setAttribute("role", "button");
-        toggleButton.setAttribute("title", "Start measuring");
-        toggleButton.setAttribute("aria-label", "Start measuring");
-
-        clearButton = L.DomUtil.create("a", "measure-map-clear", bar);
-        clearButton.href = "#";
-        clearButton.setAttribute("role", "button");
-        clearButton.setAttribute("title", "Clear measurement");
-        clearButton.setAttribute("aria-label", "Clear measurement");
-
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.on(toggleButton, "click", (event) => {
-          L.DomEvent.preventDefault(event);
-          isMeasuring = !isMeasuring;
-          updateButtons();
-        });
-        L.DomEvent.on(clearButton, "click", (event) => {
-          L.DomEvent.preventDefault(event);
-          clearMeasurement();
-        });
-
-        updateButtons();
-        return container;
-      },
-    });
-
-    map.addControl(new MeasureControl());
-    map.on("click", (event) => {
-      if (!isMeasuring) return;
-      measurePoints.push(event.latlng);
-      renderMeasurement();
-    });
-  }
+  const severityColors = {
+    low: "#86c5a3",
+    moderate: "#efb366",
+    high: "#d9485f",
+    none: "#9aa4a0",
+  };
 
   const indicatorPalette = [
     "#1d4ed8",
@@ -353,31 +70,30 @@
     "#a16207",
   ];
 
-  function indicatorLabel(value) {
-    const normalized = normalizeIssueLabel(value);
-    if (!normalized) return "Unspecified";
-    if (normalized === "grazing pressure high") return "High Grazing Pressure";
-    if (normalized === "contour bund") return "Contour Bund (CB)";
-    if (normalized === "cb plus") return "CB+ (Contour Bund in Good Condition)";
-    if (normalized === "cb minus") return "CB- (Contour Bund in Bad Condition)";
-    if (normalized === "dam") return "High potential damming point";
-    if (normalized === "d plus") return "D+ (Dam in Good Condition)";
-    if (normalized === "d minus") return "D- (Dam in Bad Condition)";
-    if (normalized === "land tenure") return "Land tenure issues";
-    if (normalized === "pollinators") return "Pollinator habitat loss";
-    if (normalized === "women barriers to accessing land water and grazing sites") {
-      return "Women barriers to accessing land, water, and grazing sites";
-    }
-    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-  }
+  const demographicCategoryOrder = [
+    "Older men",
+    "Older women",
+    "Younger men",
+    "Younger women",
+  ];
 
-  function popupLabel(value) {
-    return (value || "")
-      .toString()
-      .replace(/_/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
+  const demographicCategoryColors = {
+    "Older men": "#0f4c81",
+    "Older women": "#b45309",
+    "Younger men": "#1d7b5f",
+    "Younger women": "#b83280",
+  };
+
+  const demographicCategoryIcons = {
+    "Older men":
+      '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="7.5" r="2.7" stroke="currentColor" stroke-width="1.7"/><path d="M7.5 19c.7-3 2.5-4.8 4.5-4.8s3.8 1.8 4.5 4.8M9.3 5.7c.6-.9 1.6-1.5 2.7-1.5 1 0 2 .5 2.6 1.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+    "Older women":
+      '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="7.2" r="2.6" stroke="currentColor" stroke-width="1.7"/><path d="M12 10.5 8.3 16h7.4L12 10.5ZM10.5 16v2.2M13.5 16v2.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    "Younger men":
+      '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="10" r="2.6" stroke="currentColor" stroke-width="1.7"/><path d="M6.8 19c.75-2.7 2.45-4.3 4.2-4.3 1.8 0 3.5 1.6 4.2 4.3M14.5 5.5h4v4M18.5 5.5l-3.4 3.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    "Younger women":
+      '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="7.4" r="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M8.8 12.2c.85-1.15 1.95-1.75 3.2-1.75 1.3 0 2.4.6 3.25 1.75M12 10.7V19M8.8 14.7H15.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  };
 
   function normalizeIssueLabel(value) {
     let normalized = (value || "")
@@ -423,10 +139,12 @@
       .replace("gulley", "gully");
 
     if (
+      normalized === "seasonal forest" ||
+      normalized === "forest seasonal" ||
       normalized === "deforestation sacred forest" ||
       normalized === "sacred forest reduction"
     ) {
-      normalized = "sacred forest reduction";
+      normalized = "sacred forest";
     }
 
     if (
@@ -474,6 +192,7 @@
       rivers: "river",
       yields: "yield",
     };
+
     if (parts.length) {
       const last = parts[parts.length - 1];
       parts[parts.length - 1] = singularTail[last] || last;
@@ -482,126 +201,761 @@
     return parts.join(" ");
   }
 
-  function buildIndicatorColorMap(features) {
-    const canonicalKeys = new Set();
-    features.forEach((feature) => {
-      const rawIndicator = feature?.properties?.indicator;
-      if (!normalizeIssueLabel(rawIndicator)) return;
-      const key = normalizeIssueLabel(indicatorLabel(rawIndicator));
-      if (key) canonicalKeys.add(key);
-    });
-
-    const keys = Array.from(canonicalKeys).sort((a, b) => a.localeCompare(b));
-
-    const mapByIndicator = new Map();
-    keys.forEach((key, index) => {
-      mapByIndicator.set(key, {
-        label: key,
-        color: indicatorPalette[index % indicatorPalette.length],
-      });
-    });
-    return mapByIndicator;
-  }
-
-  function indicatorColor(indicatorColors, value) {
-    const key = normalizeIssueLabel(indicatorLabel(value));
-    return indicatorColors.get(key)?.color || "#334155";
+  function indicatorLabel(value) {
+    const normalized = normalizeIssueLabel(value);
+    if (!normalized) return "Unspecified";
+    if (normalized === "sacred forest") return "Sacred forest";
+    if (normalized === "grazing pressure high") return "High Grazing Pressure";
+    if (normalized === "contour bund") return "Contour Bund (CB)";
+    if (normalized === "cb plus") return "CB+ (Contour Bund in Good Condition)";
+    if (normalized === "cb minus") return "CB- (Contour Bund in Bad Condition)";
+    if (normalized === "dam") return "High potential damming point";
+    if (normalized === "d plus") return "D+ (Dam in Good Condition)";
+    if (normalized === "d minus") return "D- (Dam in Bad Condition)";
+    if (normalized === "land tenure") return "Land tenure issues";
+    if (normalized === "pollinators") return "Pollinator habitat loss";
+    if (normalized === "women barriers to accessing land water and grazing sites") {
+      return "Women barriers to accessing land, water, and grazing sites";
+    }
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
   }
 
   function severityLabel(value) {
-    if (value === null || value === undefined || value === "") return "-";
     const numeric = Number(value);
-    if (Number.isNaN(numeric)) return `${value}`;
-    if (numeric <= 1) return "1 - Low severity";
-    if (numeric <= 3) return "3 - Moderate severity";
-    return "5 - High severity";
+    if (Number.isNaN(numeric)) return "Not scored";
+    if (numeric <= 1) return "Low";
+    if (numeric <= 3) return "Moderate";
+    return "High";
   }
 
-  function addLegendControl(indicatorColors) {
-    document
-      .querySelectorAll(".leaflet-control .map-legend")
-      .forEach((legendNode) => {
-        const controlNode = legendNode.closest(".leaflet-control");
-        if (controlNode && controlNode.parentNode) {
-          controlNode.parentNode.removeChild(controlNode);
-        }
-      });
+  function severityBucket(value) {
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return "none";
+    if (numeric <= 1) return "low";
+    if (numeric <= 3) return "moderate";
+    return "high";
+  }
 
-    if (legendControl) {
-      map.removeControl(legendControl);
-      legendControl = null;
+  function hotspotCategory(indicator) {
+    const value = normalizeIssueLabel(indicator);
+    if (!value) return "Intervention Areas";
+
+    if (
+      value.includes("priority") ||
+      value.includes("women barriers") ||
+      value.includes("land tenure")
+    ) {
+      return "Socio-economic Hotspots";
     }
 
-    const legend = L.control({ position: "topright" });
+    if (
+      value.includes("contour bund") ||
+      value.includes("terrace") ||
+      value.includes("ridge") ||
+      value.includes("dam") ||
+      value === "cb plus" ||
+      value === "cb minus" ||
+      value === "d plus" ||
+      value === "d minus"
+    ) {
+      return "Intervention Areas";
+    }
 
-    legend.onAdd = () => {
-      const div = L.DomUtil.create("div", "map-legend");
-      const seen = new Set();
-      const rows = Array.from(indicatorColors.values())
-        .filter(({ label }) => {
-          const dedupeKey = normalizeIssueLabel(label);
-          if (seen.has(dedupeKey)) return false;
-          seen.add(dedupeKey);
-          return true;
-        })
-        .map(
-          ({ label, color }) =>
-            `<div class="row"><span class="swatch" style="background:${color}"></span><span>${indicatorLabel(label)}</span></div>`
-        )
-        .join("");
-      div.innerHTML = `<h4>Hotspots</h4>${rows}`;
-      return div;
-    };
+    if (
+      value.includes("borehole") ||
+      value.includes("river") ||
+      value.includes("wetland") ||
+      value.includes("stream") ||
+      value.includes("water") ||
+      value.includes("lake") ||
+      value.includes("run off") ||
+      value.includes("flood") ||
+      value.includes("irrigation") ||
+      value.includes("spring") ||
+      value.includes("shallow well") ||
+      value.includes("illegal abstraction")
+    ) {
+      return "Hydrological and Water Stress Hotspots";
+    }
 
-    legend.addTo(map);
-    legendControl = legend;
+    if (
+      value.includes("erosion") ||
+      value.includes("gully") ||
+      value.includes("sedimentation")
+    ) {
+      return "Soil Related Hotspots";
+    }
+
+    if (
+      value.includes("yield") ||
+      value.includes("fertility") ||
+      value.includes("nutrient") ||
+      value.includes("grazing") ||
+      value.includes("pasture")
+    ) {
+      return "Crop and Productivity Hotspots";
+    }
+
+    if (
+      value.includes("forest") ||
+      value.includes("reforestation") ||
+      value.includes("wildlife") ||
+      value.includes("pollinators") ||
+      value.includes("riparian") ||
+      value.includes("deforestation")
+    ) {
+      return "Land  Use and Ecologcal Hotspots";
+    }
+
+    return "Intervention Areas";
   }
 
-  function centerOnFeatures(features, layer) {
-    map.invalidateSize({ pan: false });
-    let hasDistrictFilter = false;
-    try {
-      const parsedUrl = new URL(window.PGIS?.locationsUrl, window.location.origin);
-      hasDistrictFilter = !!parsedUrl.searchParams.get("district");
-    } catch (e) {}
+  function popupLabel(value) {
+    return (value || "")
+      .toString()
+      .replace(/gulley/gi, "gully")
+      .replace(/_/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
 
-    if (!features.length) {
-      map.setView([-14.6, 34.9], 7);
+  function buildIndicatorColorMap(rows) {
+    const keys = Array.from(
+      new Set(rows.map((row) => row.indicatorKey).filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b));
+    const map = new Map();
+    keys.forEach((key, index) => {
+      map.set(key, indicatorPalette[index % indicatorPalette.length]);
+    });
+    return map;
+  }
+
+  function indicatorColor(indicatorKey) {
+    return state.indicatorColors.get(indicatorKey) || "#334155";
+  }
+
+  function computeMapView(rows) {
+    if (!rows.length) {
+      return {
+        center: { lat: -14.6, lon: 34.9 },
+        zoom: 6,
+      };
+    }
+
+    const latitudes = rows.map((row) => row.lat);
+    const longitudes = rows.map((row) => row.lon);
+    const latMin = Math.min.apply(null, latitudes);
+    const latMax = Math.max.apply(null, latitudes);
+    const lonMin = Math.min.apply(null, longitudes);
+    const lonMax = Math.max.apply(null, longitudes);
+    const latSpan = Math.max(0.01, latMax - latMin);
+    const lonSpan = Math.max(0.01, lonMax - lonMin);
+    const latZoom = Math.log2(170 / (latSpan * 1.25));
+    const lonZoom = Math.log2(360 / (lonSpan * 1.25));
+    const computedZoom = Math.min(latZoom, lonZoom);
+    const zoom = Math.max(4, Math.min(13, computedZoom));
+
+    return {
+      center: {
+        lat: (latMin + latMax) / 2,
+        lon: (lonMin + lonMax) / 2,
+      },
+      zoom,
+    };
+  }
+
+  function participantCategory(sourceFile) {
+    const value = (sourceFile || "").toString().toLowerCase();
+    if (value.includes("older_men")) return "Older men";
+    if (value.includes("older_women")) return "Older women";
+    if (value.includes("younger_men") || value.includes("young_men")) return "Younger men";
+    if (value.includes("younger_women") || value.includes("young_women")) return "Younger women";
+    return "Uncategorized";
+  }
+
+  function countBy(items, selector) {
+    const counts = new Map();
+    items.forEach((item) => {
+      const key = selector(item);
+      if (!key) return;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, count }));
+  }
+
+  function topRowsByCount(items, selector, limit) {
+    return countBy(items, selector)
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+      .slice(0, limit);
+  }
+
+  function sumBy(items, selector, valueSelector, limit) {
+    const counts = new Map();
+    items.forEach((item) => {
+      const key = selector(item);
+      if (!key) return;
+      counts.set(key, (counts.get(key) || 0) + valueSelector(item));
+    });
+    return Array.from(counts.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+      .slice(0, limit);
+  }
+
+  function getScopedRows() {
+    if (!state.activeIndicator) return state.rows;
+    return state.rows.filter((row) => row.indicatorKey === state.activeIndicator);
+  }
+
+  function getActiveLocation(rows) {
+    return rows.find((row) => row.id === state.activeLocationId) || null;
+  }
+
+  function findLocationById(locationId) {
+    return state.rows.find((row) => row.id === locationId) || null;
+  }
+
+  function selectLocation(locationId) {
+    const row = findLocationById(locationId);
+    if (!row) return;
+
+    const isSameLocation = state.activeLocationId === locationId;
+    if (isSameLocation) {
+      state.activeLocationId = "";
+      renderDashboard();
       return;
     }
 
-    if (features.length === 1) {
-      const coords = features[0]?.geometry?.coordinates;
-      if (Array.isArray(coords) && coords.length >= 2) {
-        map.setView([coords[1], coords[0]], 12);
-        return;
-      }
-    }
+    state.activeLocationId = `${locationId}`;
+    renderDashboard();
 
-    const bounds = layer.getBounds();
-    if (bounds.isValid()) {
-      const paddedBounds = bounds.pad(0.06);
-      map.fitBounds(paddedBounds, {
-        maxZoom: 15,
-        animate: false,
-        paddingTopLeft: [20, 20],
-        paddingBottomRight: [20, 20],
-      });
-      const targetZoom = hasDistrictFilter ? 14 : 8;
-      map.setView(paddedBounds.getCenter(), targetZoom, { animate: false });
+    const mapCard = document.querySelector(".chart-card--map");
+    if (mapCard) {
+      mapCard.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }
 
-  setupSidebarToggle();
-  setupMeasureTool();
+  function setTablePage(nextPage) {
+    state.tablePage = Math.max(1, nextPage);
+    renderDashboard();
+  }
 
-  const filterForm = document.querySelector("form.filters");
-  if (filterForm) {
+  function setText(id, value) {
+    const node = document.getElementById(id);
+    if (node) node.textContent = value;
+  }
+
+  function renderEmptyChart(id, message) {
+    Plotly.react(
+      id,
+      [],
+      {
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        margin: { l: 16, r: 16, t: 16, b: 16 },
+        xaxis: { visible: false },
+        yaxis: { visible: false },
+        annotations: [
+          {
+            text: message,
+            showarrow: false,
+            font: { size: 14, color: "#55615d" },
+          },
+        ],
+      },
+      { responsive: true, displayModeBar: false }
+    );
+  }
+
+  function buildRows(geojson) {
+    return (geojson.features || [])
+      .map((feature) => {
+        const properties = feature.properties || {};
+        const coordinates = feature.geometry?.coordinates || [];
+        const severity = Number(properties.severity);
+        const indicatorKey = normalizeIssueLabel(properties.indicator);
+        const lat = Number(coordinates[1]);
+        const lon = Number(coordinates[0]);
+
+        return {
+          id: properties.id,
+          label: popupLabel(properties.label || properties.name) || "Unlabeled point",
+          district: properties.district || "Unknown district",
+          indicator: indicatorLabel(properties.indicator),
+          indicatorKey,
+        category: hotspotCategory(properties.indicator),
+        participantCategory: participantCategory(properties.source_file),
+        severity: Number.isNaN(severity) ? null : severity,
+        severityBand: severityLabel(severity),
+        severityKey: severityBucket(severity),
+          lat,
+          lon,
+        };
+      })
+      .filter((row) => Number.isFinite(row.lat) && Number.isFinite(row.lon));
+  }
+
+  function renderStats(rows) {
+    const scopedRows = rows;
+    const severityValues = scopedRows
+      .map((row) => row.severity)
+      .filter((value) => typeof value === "number");
+    const averageSeverity = severityValues.length
+      ? (severityValues.reduce((sum, value) => sum + value, 0) / severityValues.length).toFixed(1)
+      : "-";
+    const topCategory = topRowsByCount(scopedRows, (row) => row.category, 1)[0];
+
+    setText("stat-total", `${scopedRows.length}`);
+    setText("stat-indicators", `${new Set(scopedRows.map((row) => row.indicatorKey).filter(Boolean)).size}`);
+    setText("stat-severity", averageSeverity);
+    setText("stat-category", topCategory ? topCategory.label : "-");
+    setText("sidebar-count", `Loaded locations: ${scopedRows.length}`);
+  }
+
+  function renderGeoChart(rows) {
+    if (!rows.length) {
+      renderEmptyChart(chartIds.geo, "No locations match the current filters.");
+      return;
+    }
+
+    const mapView = computeMapView(rows);
+    const activeLocation = getActiveLocation(rows);
+
+    Plotly.react(
+      chartIds.geo,
+      [
+        {
+          type: "scattermap",
+          mode: "markers",
+          lat: rows.map((row) => row.lat),
+          lon: rows.map((row) => row.lon),
+          customdata: rows.map((row) => [row.indicatorKey, row.district, row.indicator, row.severityBand]),
+          text: rows.map((row) => row.label),
+          hovertemplate:
+            "<b>%{text}</b><br>" +
+            "District: %{customdata[1]}<br>" +
+            "Hotspot: %{customdata[2]}<br>" +
+            "Severity: %{customdata[3]}<extra></extra>",
+          marker: {
+            size: rows.map((row) => {
+              const base = 10 + ((row.severity || 1) * 3);
+              return row.id === activeLocation?.id ? base + 8 : base;
+            }),
+            color: rows.map((row) => indicatorColor(row.indicatorKey)),
+            line: {
+              color: rows.map((row) =>
+                row.id === activeLocation?.id
+                  ? "#facc15"
+                  : severityColors[row.severityKey] || severityColors.none
+              ),
+              width: rows.map((row) => (row.id === activeLocation?.id ? 4 : 2)),
+            },
+            opacity: 0.88,
+          },
+        },
+      ],
+      {
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        margin: { l: 0, r: 0, t: 0, b: 0 },
+        map: {
+          style: "satellite-streets",
+          center: activeLocation
+            ? { lat: activeLocation.lat, lon: activeLocation.lon }
+            : mapView.center,
+          zoom: activeLocation ? Math.max(mapView.zoom, 13) : mapView.zoom,
+        },
+      },
+      { responsive: true, displayModeBar: false }
+    );
+  }
+
+  function renderIndicatorChart(rows) {
+    const summary = topRowsByCount(rows, (row) => row.indicatorKey, 12);
+    if (!summary.length) {
+      renderEmptyChart(chartIds.indicator, "No hotspot indicators available.");
+      return;
+    }
+
+    const labels = summary.map((item) => indicatorLabel(item.label));
+    const values = summary.map((item) => item.count);
+    const colors = summary.map((item) => indicatorColor(item.label));
+
+    Plotly.react(
+      chartIds.indicator,
+      [
+        {
+          type: "bar",
+          orientation: "h",
+          y: labels.slice().reverse(),
+          x: values.slice().reverse(),
+          customdata: summary.map((item) => item.label).reverse(),
+          marker: { color: colors.slice().reverse(), line: { color: "#ffffff", width: 1 } },
+          hovertemplate: "%{y}<br>Locations: %{x}<extra></extra>",
+        },
+      ],
+      {
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        margin: { l: 160, r: 24, t: 10, b: 36 },
+        xaxis: {
+          title: "Locations",
+          gridcolor: "rgba(29, 43, 40, 0.1)",
+          zeroline: false,
+        },
+        yaxis: { automargin: true },
+      },
+      { responsive: true, displayModeBar: false }
+    );
+  }
+
+  function renderSeverityChart(rows) {
+    const order = ["Low", "Moderate", "High", "Not scored"];
+    const colorMap = {
+      Low: severityColors.low,
+      Moderate: severityColors.moderate,
+      High: severityColors.high,
+      "Not scored": severityColors.none,
+    };
+    const summary = topRowsByCount(rows, (row) => row.severityBand, 10)
+      .sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label));
+
+    if (!summary.length) {
+      renderEmptyChart(chartIds.severity, "No severity data available.");
+      return;
+    }
+
+    Plotly.react(
+      chartIds.severity,
+      [
+        {
+          type: "pie",
+          labels: summary.map((item) => item.label),
+          values: summary.map((item) => item.count),
+          hole: 0.58,
+          sort: false,
+          marker: { colors: summary.map((item) => colorMap[item.label]) },
+          textinfo: "label+percent",
+          hovertemplate: "%{label}: %{value} locations<extra></extra>",
+        },
+      ],
+      {
+        paper_bgcolor: "rgba(0,0,0,0)",
+        margin: { l: 16, r: 16, t: 16, b: 16 },
+        showlegend: false,
+      },
+      { responsive: true, displayModeBar: false }
+    );
+  }
+
+  function renderCategoryChart(rows) {
+    const summary = topRowsByCount(rows, (row) => row.category, 10);
+    if (!summary.length) {
+      renderEmptyChart(chartIds.category, "No category data available.");
+      return;
+    }
+
+    Plotly.react(
+      chartIds.category,
+      [
+        {
+          type: "treemap",
+          labels: ["Hotspot families"].concat(summary.map((item) => item.label)),
+          parents: [""].concat(summary.map(() => "Hotspot families")),
+          values: [summary.reduce((sum, item) => sum + item.count, 0)].concat(
+            summary.map((item) => item.count)
+          ),
+          marker: {
+            colors: ["#e8dcc7"].concat(
+              summary.map((item) => categoryColors[item.label] || "#1d7b5f")
+            ),
+            line: { color: "#ffffff", width: 2 },
+          },
+          branchvalues: "total",
+          textinfo: "label+value",
+          hovertemplate: "%{label}<br>Locations: %{value}<extra></extra>",
+          tiling: { pad: 4 },
+          pathbar: { visible: false },
+        },
+      ],
+      {
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        margin: { l: 10, r: 10, t: 10, b: 10 },
+      },
+      { responsive: true, displayModeBar: false }
+    );
+  }
+
+  function renderVotesChart() {
+    const votesCard = document.getElementById("votes-card");
+    const filteredVotes = state.activeIndicator
+      ? state.votes.filter((row) => row.indicatorKey === state.activeIndicator)
+      : state.votes;
+    const summary = sumBy(filteredVotes, (row) => row.indicatorKey, (row) => row.votes, 10);
+
+    if (!summary.length) {
+      if (votesCard) {
+        votesCard.hidden = true;
+      }
+      return;
+    }
+
+    if (votesCard) {
+      votesCard.hidden = false;
+    }
+
+    Plotly.react(
+      chartIds.votes,
+      [
+        {
+          type: "bar",
+          orientation: "h",
+          y: summary.map((item) => indicatorLabel(item.label)).reverse(),
+          x: summary.map((item) => item.count).reverse(),
+          marker: {
+            color: "#12352d",
+            line: { color: "#ffffff", width: 1 },
+          },
+          hovertemplate: "%{y}<br>Votes: %{x}<extra></extra>",
+        },
+      ],
+      {
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        margin: { l: 170, r: 20, t: 10, b: 36 },
+        xaxis: {
+          title: "Votes",
+          gridcolor: "rgba(29, 43, 40, 0.1)",
+          zeroline: false,
+        },
+        yaxis: { automargin: true },
+      },
+      { responsive: true, displayModeBar: false }
+    );
+  }
+
+  function renderTable(rows) {
+    const tbody = document.getElementById("locations-table-body");
+    const pagination = document.getElementById("locations-pagination");
+    if (!tbody) return;
+
+    const sortedRows = rows
+      .slice()
+      .sort((a, b) => {
+        const severityA = typeof a.severity === "number" ? a.severity : -1;
+        const severityB = typeof b.severity === "number" ? b.severity : -1;
+        return severityB - severityA || a.label.localeCompare(b.label);
+      });
+
+    const totalPages = Math.max(1, Math.ceil(sortedRows.length / tableRowsPerPage));
+    if (state.activeLocationId) {
+      const selectedIndex = sortedRows.findIndex((row) => row.id === state.activeLocationId);
+      if (selectedIndex >= 0) {
+        state.tablePage = Math.floor(selectedIndex / tableRowsPerPage) + 1;
+      }
+    }
+    state.tablePage = Math.min(Math.max(1, state.tablePage), totalPages);
+
+    const startIndex = (state.tablePage - 1) * tableRowsPerPage;
+    const pageRows = sortedRows.slice(startIndex, startIndex + tableRowsPerPage);
+
+    if (!pageRows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No locations match the current focus.</td></tr>';
+      if (pagination) {
+        pagination.innerHTML = "";
+      }
+      return;
+    }
+
+    tbody.innerHTML = pageRows
+      .map(
+        (row) => `
+          <tr
+            class="location-row ${row.id === state.activeLocationId ? "is-selected" : ""}"
+          >
+            <td>
+              <button
+                type="button"
+                class="location-row-button"
+                data-location-id="${row.id}"
+                aria-pressed="${row.id === state.activeLocationId ? "true" : "false"}"
+              >
+                <div class="location-row-main">
+                <strong>${row.label}</strong>
+                </div>
+              </button>
+            </td>
+            <td>${row.district}</td>
+            <td>${row.indicator}</td>
+            <td>${row.severityBand}</td>
+            <td>${row.lat.toFixed(4)}, ${row.lon.toFixed(4)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    tbody.querySelectorAll(".location-row-button").forEach((button) => {
+      const activate = () => {
+        const locationId = button.dataset.locationId;
+        if (!locationId) return;
+        selectLocation(locationId);
+      };
+
+      button.addEventListener("click", activate);
+      button.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        activate();
+      });
+    });
+
+    if (pagination) {
+      pagination.innerHTML = `
+        <button type="button" class="pager-btn" data-page="${state.tablePage - 1}" ${state.tablePage <= 1 ? "disabled" : ""}>Previous</button>
+        <span class="pager-status">Page ${state.tablePage} of ${totalPages}</span>
+        <button type="button" class="pager-btn" data-page="${state.tablePage + 1}" ${state.tablePage >= totalPages ? "disabled" : ""}>Next</button>
+      `;
+
+      pagination.querySelectorAll(".pager-btn").forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextPage = Number(button.dataset.page);
+          if (Number.isNaN(nextPage)) return;
+          setTablePage(nextPage);
+        });
+      });
+    }
+  }
+
+  function renderCategoryStats(rows) {
+    const container = document.getElementById("category-stats-grid");
+    if (!container) return;
+
+    if (!rows.length) {
+      container.innerHTML = '<div class="category-stat-empty">No category stats available for the current focus.</div>';
+      return;
+    }
+
+    const counts = new Map(
+      demographicCategoryOrder.map((label) => [label, 0])
+    );
+    rows.forEach((row) => {
+      if (!counts.has(row.participantCategory)) return;
+      counts.set(row.participantCategory, counts.get(row.participantCategory) + 1);
+    });
+    const summary = demographicCategoryOrder.map((label) => ({
+      label,
+      count: counts.get(label) || 0,
+    }));
+
+    container.innerHTML = summary
+      .map(
+        (item) => `
+          <article class="category-stat-tile">
+            <span class="category-stat-icon" style="color:${demographicCategoryColors[item.label] || "#1d7b5f"}">
+              ${demographicCategoryIcons[item.label] || ""}
+            </span>
+            <div class="category-stat-copy">
+              <strong>${item.count}</strong>
+              <span>${item.label}</span>
+            </div>
+          </article>
+        `
+      )
+      .join("");
+  }
+
+  function updateFocusText(scopedRows) {
+    const focusLabel = document.getElementById("focus-indicator");
+    const focusCopy = document.getElementById("focus-copy");
+
+    if (!focusLabel || !focusCopy) return;
+
+    if (!state.activeIndicator) {
+      focusLabel.textContent = "All hotspots";
+      focusCopy.textContent =
+        "Use the hotspot list or chart bars to focus the dashboard on a single indicator.";
+      return;
+    }
+
+    focusLabel.textContent = indicatorLabel(state.activeIndicator);
+    focusCopy.textContent = `${scopedRows.length} location${scopedRows.length === 1 ? "" : "s"} in the current view match this hotspot.`;
+  }
+
+  function syncHotspotButtons() {
+    document.querySelectorAll(".hotspot-item").forEach((button) => {
+      const indicatorKey = normalizeIssueLabel(button.dataset.indicator || button.textContent || "");
+      const isActive = indicatorKey === state.activeIndicator;
+      const color = indicatorColor(indicatorKey);
+      button.style.setProperty("--hotspot-color", color);
+      const row = button.closest(".top-indicator-row");
+      if (row) {
+        row.style.setProperty("--hotspot-color", color);
+      }
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+  }
+
+  function renderDashboard() {
+    const scopedRows = getScopedRows();
+    if (state.activeLocationId && !getActiveLocation(scopedRows)) {
+      state.activeLocationId = "";
+    }
+    renderStats(scopedRows);
+    renderCategoryStats(scopedRows);
+    renderGeoChart(scopedRows);
+    renderIndicatorChart(scopedRows);
+    renderSeverityChart(scopedRows);
+    renderCategoryChart(scopedRows);
+    renderVotesChart();
+    renderTable(scopedRows);
+    updateFocusText(scopedRows);
+    syncHotspotButtons();
+  }
+
+  function setActiveIndicator(indicatorKey) {
+    state.activeIndicator = state.activeIndicator === indicatorKey ? "" : indicatorKey;
+    state.tablePage = 1;
+    renderDashboard();
+  }
+
+  function bindChartEvents() {
+    const indicatorChart = document.getElementById(chartIds.indicator);
+    const geoChart = document.getElementById(chartIds.geo);
+    if (indicatorChart && !indicatorChart.dataset.bound) {
+      indicatorChart.on("plotly_click", (event) => {
+        const point = event?.points?.[0];
+        const indicatorKey = point?.customdata;
+        if (indicatorKey) {
+          setActiveIndicator(indicatorKey);
+        }
+      });
+      indicatorChart.dataset.bound = "1";
+    }
+    if (geoChart && !geoChart.dataset.bound) {
+      geoChart.on("plotly_click", (event) => {
+        const point = event?.points?.[0];
+        const row = getScopedRows()[point?.pointIndex];
+        if (row?.id) {
+          selectLocation(row.id);
+          const tableRow = document.querySelector(`[data-location-id="${row.id}"]`);
+          if (tableRow) {
+            tableRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          }
+        }
+      });
+      geoChart.dataset.bound = "1";
+    }
+  }
+
+  function setupFilterForm() {
+    const filterForm = document.querySelector("form.filters");
+    if (!filterForm) return;
+
     let submitting = false;
     filterForm.addEventListener("submit", (event) => {
-      if (submitting) {
-        return;
-      }
+      if (submitting) return;
       event.preventDefault();
       submitting = true;
 
@@ -614,13 +968,13 @@
           label.textContent = label.dataset.loading;
         }
       }
+
       try {
         window.sessionStorage.setItem("pgis_skip_loader_once", "1");
       } catch (e) {}
 
-      // Allow at least one paint so spinner is visible before navigation.
       window.requestAnimationFrame(() => {
-        window.setTimeout(() => filterForm.submit(), 450);
+        window.setTimeout(() => filterForm.submit(), 250);
       });
     });
   }
@@ -659,17 +1013,13 @@
     });
   }
 
-  setupIndicatorGroupsCollapsible();
-
   function setupIndicatorGroupToggles() {
     const groups = Array.from(document.querySelectorAll("details.indicator-group"));
     if (!groups.length) return;
 
     groups.forEach((group) => {
       const toggle = group.querySelector("[data-indicator-group-toggle]");
-      const inputs = Array.from(
-        group.querySelectorAll('input[name="indicator"]')
-      );
+      const inputs = Array.from(group.querySelectorAll('input[name="indicator"]'));
       if (!toggle || !inputs.length) return;
 
       const syncToggleState = () => {
@@ -694,141 +1044,8 @@
     });
   }
 
-  setupIndicatorGroupToggles();
-
-  function setupMapSearchToggle() {
-    const container = document.querySelector(".map-search-control");
-    if (!container) return;
-    const toggle = container.querySelector(".map-search-toggle");
-    const input = container.querySelector('input[name="q"]');
-    if (!toggle || !input) return;
-    const initialQuery = input.value.trim();
-    let hadQuery = !!initialQuery;
-    let clearingInProgress = false;
-
-    const submitWithoutSearch = () => {
-      if (!filterForm || clearingInProgress) return;
-      clearingInProgress = true;
-      input.value = "";
-      if (typeof filterForm.requestSubmit === "function") {
-        filterForm.requestSubmit();
-      } else {
-        filterForm.submit();
-      }
-    };
-
-    const setOpen = (isOpen) => {
-      container.classList.toggle("is-open", isOpen);
-      toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
-      if (isOpen) {
-        window.requestAnimationFrame(() => input.focus());
-      }
-    };
-
-    toggle.addEventListener("click", () => {
-      setOpen(!container.classList.contains("is-open"));
-    });
-
-    input.addEventListener("input", () => {
-      const value = input.value.trim();
-      if (value) {
-        hadQuery = true;
-        return;
-      }
-      if (hadQuery) {
-        hadQuery = false;
-        submitWithoutSearch();
-      }
-    });
-
-    document.addEventListener("click", (event) => {
-      if (!container.classList.contains("is-open")) return;
-      if (container.contains(event.target)) return;
-      if (input.value.trim()) return;
-      setOpen(false);
-    });
-  }
-
-  setupMapSearchToggle();
-
-  function setupHotspotHighlight(layer, indicatorColors) {
-    const hotspotButtons = Array.from(document.querySelectorAll(".hotspot-item"));
-    if (!hotspotButtons.length || !layer) return;
-
-    const applyBaseStyle = (markerLayer) => {
-      const rawIndicator = indicatorLabel(
-        markerLayer.feature?.properties?.indicator
-      );
-      markerLayer.setStyle({
-        weight: 1,
-        color: "#0b1720",
-        fillColor: indicatorColor(indicatorColors, rawIndicator),
-        fillOpacity: 1,
-        opacity: 1,
-      });
-    };
-
-    const applyDimStyle = (markerLayer) => {
-      markerLayer.setStyle({
-        weight: 1,
-        color: "#64748b",
-        fillColor: "#cbd5e1",
-        fillOpacity: 0.2,
-        opacity: 0.25,
-      });
-    };
-
-    const clearHotspotSelection = () => {
-      hotspotButtons.forEach((button) => {
-        button.classList.remove("is-active");
-        button.setAttribute("aria-pressed", "false");
-      });
-      layer.eachLayer((markerLayer) => {
-        applyBaseStyle(markerLayer);
-      });
-    };
-
-    hotspotButtons.forEach((button) => {
-      button.addEventListener("click", () => {
-        const wasActive = button.classList.contains("is-active");
-        clearHotspotSelection();
-        if (wasActive) return;
-
-        button.classList.add("is-active");
-        button.setAttribute("aria-pressed", "true");
-
-        const selectedIssue = normalizeIssueLabel(button.textContent || "");
-        layer.eachLayer((markerLayer) => {
-          const markerIssue = normalizeIssueLabel(
-            markerLayer.feature?.properties?.indicator || ""
-          );
-          const isMatch = markerIssue === selectedIssue;
-          if (isMatch) {
-            markerLayer.setStyle({
-              weight: 2,
-              color: "#8a6a00",
-              fillColor: "#facc15",
-              fillOpacity: 1,
-              opacity: 1,
-            });
-            if (typeof markerLayer.bringToFront === "function") {
-              markerLayer.bringToFront();
-            }
-          } else {
-            applyDimStyle(markerLayer);
-          }
-        });
-      });
-    });
-  }
-
   function setupSkipLoaderLinks() {
-    const skipLoaderLinks = Array.from(
-      document.querySelectorAll('a[data-skip-loader="1"]')
-    );
-    if (!skipLoaderLinks.length) return;
-
-    skipLoaderLinks.forEach((link) => {
+    document.querySelectorAll('a[data-skip-loader="1"]').forEach((link) => {
       link.addEventListener("click", () => {
         try {
           window.sessionStorage.setItem("pgis_skip_loader_once", "1");
@@ -837,63 +1054,65 @@
     });
   }
 
-  setupSkipLoaderLinks();
-
-  fetch(window.PGIS.locationsUrl)
-    .then((response) => response.json())
-    .then((geojson) => {
-      const features = geojson.features || [];
-      const indicatorColors = buildIndicatorColorMap(features);
-      const layer = L.geoJSON(geojson, {
-        pointToLayer: (feature, latlng) => {
-          const issueKey = normalizeIssueLabel(feature?.properties?.indicator);
-          const issueColor = indicatorColor(indicatorColors, feature?.properties?.indicator);
-          if (issueKey === "borehole") {
-            return L.circleMarker(latlng, {
-              radius: 4,
-              pane: "bufferPane",
-              weight: 1,
-              color: "#0b1720",
-              opacity: 1,
-              fillColor: issueColor,
-              fillOpacity: 1,
-            });
-          }
-          return L.circle(latlng, {
-            radius: 100,
-            pane: "bufferPane",
-            weight: 1,
-            color: "#0b1720",
-            opacity: 1,
-            fillColor: issueColor,
-            fillOpacity: 1,
-          });
-        },
-        onEachFeature: (feature, layer) => {
-          const p = feature.properties;
-          layer.bindPopup(
-            `<strong>${popupLabel(p.label || p.name) || "-"}</strong><br>` +
-            `District: ${p.district || "-"}<br>` +
-            `Environmental Hotspots: ${indicatorLabel(p.indicator)}<br>` +
-            `Severity: ${severityLabel(p.severity)}`
-          );
-        },
-      }).addTo(map);
-
-      requestAnimationFrame(() => {
-        centerOnFeatures(features, layer);
-        hideLoader();
-        hidePointsLoader();
+  function setupHotspotFocusControls() {
+    document.querySelectorAll(".hotspot-item").forEach((button) => {
+      button.addEventListener("click", () => {
+        const indicatorKey = normalizeIssueLabel(button.dataset.indicator || button.textContent || "");
+        setActiveIndicator(indicatorKey);
       });
-
-      addLegendControl(indicatorColors);
-      setupHotspotHighlight(layer, indicatorColors);
-    })
-    .catch((err) => {
-      // Keep map usable even if data fails to load.
-      console.error("Failed to load locations", err);
-      hideLoader();
-      hidePointsLoader();
     });
 
+    const clearButton = document.getElementById("clear-hotspot-focus");
+    if (clearButton) {
+      clearButton.addEventListener("click", () => {
+        state.activeIndicator = "";
+        renderDashboard();
+      });
+    }
+  }
+
+  function fetchJson(url) {
+    return fetch(url).then((response) => {
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
+      }
+      return response.json();
+    });
+  }
+
+  setupFilterForm();
+  setupIndicatorGroupsCollapsible();
+  setupIndicatorGroupToggles();
+  setupSkipLoaderLinks();
+  setupHotspotFocusControls();
+
+  Promise.all([
+    fetchJson(window.PGIS.locationsUrl),
+    fetchJson(window.PGIS.indicatorApiUrl).catch(() => ({ results: [] })),
+  ])
+    .then(([geojson, votePayload]) => {
+      state.rows = buildRows(geojson);
+      state.indicatorColors = buildIndicatorColorMap(state.rows);
+      state.votes = (votePayload.results || []).map((row) => ({
+        indicatorKey: normalizeIssueLabel(row.indicator),
+        votes: Number(row.votes) || 0,
+      }));
+
+      renderDashboard();
+      bindChartEvents();
+      hideLoader();
+    })
+    .catch((error) => {
+      console.error("Failed to load dashboard data", error);
+      Object.values(chartIds).forEach((id) => {
+        if (id === chartIds.votes) return;
+        renderEmptyChart(id, "Dashboard data could not be loaded.");
+      });
+      const votesCard = document.getElementById("votes-card");
+      if (votesCard) {
+        votesCard.hidden = true;
+      }
+      renderTable([]);
+      hideLoader();
+    });
 })();
