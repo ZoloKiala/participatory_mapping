@@ -15,7 +15,8 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260415-hero-dashboard-icon-large">
+  <script type="module" src="https://unpkg.com/@dotlottie/player-component@2.3.0/dist/dotlottie-player.mjs"></script>
+  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260415-loader-lottie">
 </head>
 <body>
   <div id="app-loader" class="app-loader" role="status" aria-live="polite" aria-label="Loading dashboard data">
@@ -30,9 +31,14 @@
         <span class="loader-side-text">Soil and Water Accelerator</span>
       </div>
       <div class="loader-mark" aria-hidden="true">
-        <span class="pin-core"></span>
-        <span class="pin-pulse p1"></span>
-        <span class="pin-pulse p2"></span>
+        <dotlottie-player
+          class="loader-lottie"
+          src="{% static 'participatory/yBSVhxzCOv.lottie' %}"
+          background="transparent"
+          speed="1"
+          loop
+          autoplay
+        ></dotlottie-player>
       </div>
       <p class="loader-title">Preparing Participatory Hotspot Dashboard</p>
       <p class="loader-subtitle">Loading charts, summaries, and location intelligence...</p>
@@ -342,6 +348,6 @@
       indicatorApiUrl: "{% url 'selection_results' %}?{{ query_string|safe }}"
     };
   </script>
-  <script src="{% static 'participatory/app.js' %}?v=20260415-location-zoom-button"></script>
+  <script src="{% static 'participatory/app.js' %}?v=20260415-loader-lottie"></script>
 </body>
 </html>
