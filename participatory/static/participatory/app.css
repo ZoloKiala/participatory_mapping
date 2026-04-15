@@ -216,6 +216,37 @@ body.is-loading .layout {
   align-items: start;
 }
 
+.hero-copy-block {
+  display: grid;
+  gap: 10px;
+}
+
+.hero-title-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.hero-icon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(29, 123, 95, 0.16), rgba(37, 108, 143, 0.18));
+  color: #184f43;
+  box-shadow:
+    0 10px 24px rgba(20, 45, 40, 0.12),
+    inset 0 0 0 1px rgba(24, 79, 67, 0.12);
+  flex: 0 0 auto;
+}
+
+.hero-icon svg {
+  width: 34px;
+  height: 34px;
+  display: block;
+}
+
 .eyebrow {
   margin: 0 0 8px;
   color: var(--accent);

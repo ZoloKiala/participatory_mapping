@@ -15,7 +15,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260415-location-zoom-button">
+  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260415-hero-dashboard-icon-large">
 </head>
 <body>
   <div id="app-loader" class="app-loader" role="status" aria-live="polite" aria-label="Loading dashboard data">
@@ -182,8 +182,16 @@
 
     <section class="dashboard-wrap">
       <header class="dashboard-hero">
-        <div>
-          <h2>Spatial hotspot dashboard</h2>
+        <div class="hero-copy-block">
+          <div class="hero-title-row">
+            <span class="hero-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <rect x="4" y="5" width="16" height="14" rx="2.5" stroke="currentColor" stroke-width="1.7"/>
+                <path d="M8 15V11M12 15V8M16 15v-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <h2>Spatial hotspot dashboard</h2>
+          </div>
           <p class="muted hero-copy">
             Explore hotspot patterns, severity clusters, and community selections without the
             Leaflet map. The charts remain driven by the same filtered location dataset.
