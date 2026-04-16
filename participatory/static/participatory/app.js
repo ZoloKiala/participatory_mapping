@@ -1051,30 +1051,85 @@
     const counts = new Map(
       demographicCategoryOrder.map((label) => [label, 0])
     );
+    let uncategorizedCount = 0;
     rows.forEach((row) => {
-      if (!counts.has(row.participantCategory)) return;
+      if (!counts.has(row.participantCategory)) {
+        uncategorizedCount += 1;
+        return;
+      }
       counts.set(row.participantCategory, counts.get(row.participantCategory) + 1);
     });
     const summary = demographicCategoryOrder.map((label) => ({
       label,
       count: counts.get(label) || 0,
     }));
+    const total = summary.reduce((sum, item) => sum + item.count, 0);
 
-    container.innerHTML = summary
-      .map(
-        (item) => `
-          <article class="category-stat-tile">
-            <span class="category-stat-icon" style="color:${demographicCategoryColors[item.label] || "#1d7b5f"}">
-              ${demographicCategoryIcons[item.label] || ""}
-            </span>
-            <div class="category-stat-copy">
-              <strong>${item.count}</strong>
-              <span>${item.label}</span>
-            </div>
-          </article>
-        `
-      )
-      .join("");
+    if (!total) {
+      container.innerHTML = '<div class="category-stat-empty">No participant groups matched the current focus.</div>';
+      return;
+    }
+
+    const matrixRows = [
+      {
+        label: "Older",
+        items: [
+          summary.find((item) => item.label === "Older men"),
+          summary.find((item) => item.label === "Older women"),
+        ],
+      },
+      {
+        label: "Younger",
+        items: [
+          summary.find((item) => item.label === "Younger men"),
+          summary.find((item) => item.label === "Younger women"),
+        ],
+      },
+    ];
+
+    const renderCell = (item) => {
+      const color = demographicCategoryColors[item.label] || "#1d7b5f";
+      const share = total ? (item.count / total) * 100 : 0;
+      return `
+        <article class="participant-matrix-cell" style="--cell-accent:${color}">
+          <span class="category-stat-icon">
+            ${demographicCategoryIcons[item.label] || ""}
+          </span>
+          <div class="participant-matrix-copy">
+            <strong>${item.count}</strong>
+            <span>${item.label}</span>
+            <span>${share.toFixed(0)}% of current focus</span>
+            <span class="participant-matrix-bar" aria-hidden="true"><span style="width:${share}%"></span></span>
+          </div>
+        </article>
+      `;
+    };
+
+    container.innerHTML = `
+      <section class="category-breakdown" aria-label="Participant breakdown by age and gender">
+        <div class="category-breakdown-summary">
+          <div class="category-breakdown-total">
+            <span>Total in current focus</span>
+            <strong>${total}</strong>
+          </div>
+          <p>Age groups run top to bottom and gender runs left to right, so differences are easier to compare at a glance.</p>
+        </div>
+        ${uncategorizedCount ? `<p class="category-breakdown-note">${uncategorizedCount} record${uncategorizedCount === 1 ? "" : "s"} could not be assigned to one of the four participant groups.</p>` : ""}
+        <div class="participant-matrix" role="presentation">
+          <div class="participant-matrix-corner" aria-hidden="true"></div>
+          <div class="participant-matrix-header">Men</div>
+          <div class="participant-matrix-header">Women</div>
+          ${matrixRows
+            .map(
+              (group) => `
+                <div class="participant-matrix-label">${group.label}</div>
+                ${group.items.map((item) => renderCell(item)).join("")}
+              `
+            )
+            .join("")}
+        </div>
+      </section>
+    `;
   }
 
   function updateFocusText(scopedRows) {
