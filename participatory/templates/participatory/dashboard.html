@@ -324,23 +324,28 @@
         <p id="focus-copy">Use the hotspot list or chart bars to focus the dashboard on a single indicator.</p>
       </section>
 
-      <section class="category-stats-card">
-        <div class="section-head">
-          <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="2.5" stroke="currentColor" stroke-width="1.7"/><circle cx="16.5" cy="9" r="2" stroke="currentColor" stroke-width="1.7"/><path d="M4.5 18c.9-2.9 3-4.5 5.5-4.5s4.6 1.6 5.5 4.5M13.5 18c.55-1.85 1.9-3 3.75-3 1.1 0 2.05.35 2.75 1.05" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>Category stats</h3>
-          <span class="chart-hint">Older/younger men and women</span>
-        </div>
-        <div class="category-stats-grid" id="category-stats-grid">
-          <div class="category-stat-empty">Loading category stats...</div>
-        </div>
-      </section>
-
       <section class="charts-grid">
         <article class="chart-card chart-card--wide chart-card--map">
           <div class="section-head">
             <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6.5 9 4l6 2.5L20 4v13.5L15 20l-6-2.5L4 20V6.5Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="11" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg></span>Spatial distribution</h3>
-            <span class="chart-hint">Severity drives marker size</span>
+            <span class="chart-hint">Hotspot points and district coverage</span>
           </div>
-          <div id="geo-chart" class="chart-slot" aria-label="Spatial hotspot chart"></div>
+          <div class="spatial-grid">
+            <section class="spatial-panel spatial-panel--points">
+              <div class="spatial-panel-head">
+                <strong>Hotspot points</strong>
+                <span>Severity drives marker size</span>
+              </div>
+              <div id="geo-chart" class="chart-slot" aria-label="Spatial hotspot chart"></div>
+            </section>
+            <section class="spatial-panel spatial-panel--districts">
+              <div class="spatial-panel-head">
+                <strong>District map</strong>
+                <span>Filled by filtered hotspot count</span>
+              </div>
+              <div id="district-chart" class="chart-slot" aria-label="District coverage chart"></div>
+            </section>
+          </div>
         </article>
 
         <article class="chart-card">
@@ -357,6 +362,16 @@
             <span class="chart-hint">Low, moderate, high</span>
           </div>
           <div id="severity-chart" class="chart-slot" aria-label="Severity chart"></div>
+        </article>
+
+        <article class="chart-card">
+          <div class="section-head">
+            <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="2.5" stroke="currentColor" stroke-width="1.7"/><circle cx="16.5" cy="9" r="2" stroke="currentColor" stroke-width="1.7"/><path d="M4.5 18c.9-2.9 3-4.5 5.5-4.5s4.6 1.6 5.5 4.5M13.5 18c.55-1.85 1.9-3 3.75-3 1.1 0 2.05.35 2.75 1.05" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>Participant breakdown</h3>
+            <span class="chart-hint">Older/younger men and women</span>
+          </div>
+          <div class="category-stats-grid" id="category-stats-grid">
+            <div class="category-stat-empty">Loading participant breakdown...</div>
+          </div>
         </article>
 
         <article class="chart-card">
@@ -408,9 +423,10 @@
   <script>
     window.PGIS = {
       locationsUrl: "{% url 'locations_geojson' %}?{{ query_string|safe }}",
+      districtsUrl: "{% url 'district_boundaries_geojson' %}?{{ query_string|safe }}",
       indicatorApiUrl: "{% url 'selection_results' %}?{{ query_string|safe }}"
     };
   </script>
-  <script src="{% static 'participatory/app.js' %}?v=20260415-m3"></script>
+  <script src="{% static 'participatory/app.js' %}?v=20260416-spatial-districts"></script>
 </body>
 </html>

@@ -22,6 +22,7 @@
 
   const state = {
     rows: [],
+    districtFeatures: [],
     votes: [],
     activeIndicator: "",
     activeLocationId: "",
@@ -33,6 +34,7 @@
 
   const chartIds = {
     geo: "geo-chart",
+    district: "district-chart",
     indicator: "indicator-chart",
     severity: "severity-chart",
     category: "category-chart",
@@ -364,6 +366,60 @@
     };
   }
 
+  function collectGeometryPoints(coordinates, points) {
+    if (!Array.isArray(coordinates)) return;
+    if (
+      coordinates.length >= 2 &&
+      typeof coordinates[0] === "number" &&
+      typeof coordinates[1] === "number"
+    ) {
+      points.push({ lon: coordinates[0], lat: coordinates[1] });
+      return;
+    }
+    coordinates.forEach((item) => collectGeometryPoints(item, points));
+  }
+
+  function computeFeatureMapView(features) {
+    if (!features.length) {
+      return {
+        center: { lat: -14.6, lon: 34.9 },
+        zoom: 6,
+      };
+    }
+
+    const points = [];
+    features.forEach((feature) => {
+      collectGeometryPoints(feature.geometry?.coordinates, points);
+    });
+
+    if (!points.length) {
+      return {
+        center: { lat: -14.6, lon: 34.9 },
+        zoom: 6,
+      };
+    }
+
+    const latitudes = points.map((point) => point.lat);
+    const longitudes = points.map((point) => point.lon);
+    const latMin = Math.min.apply(null, latitudes);
+    const latMax = Math.max.apply(null, latitudes);
+    const lonMin = Math.min.apply(null, longitudes);
+    const lonMax = Math.max.apply(null, longitudes);
+    const latSpan = Math.max(0.02, latMax - latMin);
+    const lonSpan = Math.max(0.02, lonMax - lonMin);
+    const latZoom = Math.log2(170 / (latSpan * 1.4));
+    const lonZoom = Math.log2(360 / (lonSpan * 1.4));
+    const computedZoom = Math.min(latZoom, lonZoom);
+
+    return {
+      center: {
+        lat: (latMin + latMax) / 2,
+        lon: (lonMin + lonMax) / 2,
+      },
+      zoom: Math.max(5.5, Math.min(10.5, computedZoom)),
+    };
+  }
+
   function participantCategory(sourceFile) {
     const value = (sourceFile || "").toString().toLowerCase();
     if (value.includes("older_men")) return "Older men";
@@ -564,6 +620,162 @@
             ? { lat: activeLocation.lat, lon: activeLocation.lon }
             : mapView.center,
           zoom: activeLocation ? Math.max(mapView.zoom, 13) : mapView.zoom,
+        },
+      },
+      { responsive: true, displayModeBar: false }
+    );
+  }
+
+  function renderDistrictChart(rows) {
+    if (!state.districtFeatures.length) {
+      renderEmptyChart(chartIds.district, "No district boundaries are available.");
+      return;
+    }
+
+    const activeLocation = getActiveLocation(rows);
+    const districtSummary = new Map();
+    rows.forEach((row) => {
+      const key = (row.district || "").trim().toLowerCase();
+      if (!key) return;
+      const current = districtSummary.get(key) || {
+        count: 0,
+        severityTotal: 0,
+        severityCount: 0,
+      };
+      current.count += 1;
+      if (typeof row.severity === "number") {
+        current.severityTotal += row.severity;
+        current.severityCount += 1;
+      }
+      districtSummary.set(key, current);
+    });
+
+    const districtGeoJson = {
+      type: "FeatureCollection",
+      features: state.districtFeatures,
+    };
+    const matchedFeatures = state.districtFeatures.filter(
+      (feature) =>
+        districtSummary.has(
+          (feature.properties?.district || feature.properties?.shapeName || "").trim().toLowerCase()
+        )
+    );
+    const districtMapView = computeFeatureMapView(
+      matchedFeatures.length ? matchedFeatures : state.districtFeatures
+    );
+    const locations = state.districtFeatures.map(
+      (feature) => feature.properties?.district || feature.properties?.shapeName || "Unknown district"
+    );
+    const matchedLocations = matchedFeatures.map(
+      (feature) => feature.properties?.district || feature.properties?.shapeName || "Unknown district"
+    );
+    const zValues = matchedLocations.map(
+      (district) => districtSummary.get(district.trim().toLowerCase())?.count || 0
+    );
+    const maxCount = Math.max(...zValues, 0);
+
+    Plotly.react(
+      chartIds.district,
+      [
+        {
+          type: "choroplethmap",
+          geojson: districtGeoJson,
+          featureidkey: "properties.district",
+          locations,
+          z: locations.map(() => 0),
+          text: locations,
+          colorscale: [
+            [0, "rgba(94,106,103,0.03)"],
+            [1, "rgba(94,106,103,0.03)"],
+          ],
+          zmin: 0,
+          zmax: 1,
+          marker: {
+            line: {
+              color: "rgba(76, 92, 87, 0.32)",
+              width: 0.9,
+            },
+          },
+          hoverinfo: "skip",
+          showscale: false,
+        },
+        {
+          type: "choroplethmap",
+          geojson: districtGeoJson,
+          featureidkey: "properties.district",
+          locations: matchedLocations,
+          z: zValues,
+          text: matchedLocations,
+          customdata: matchedLocations.map((district) => {
+            const summary = districtSummary.get(district.trim().toLowerCase()) || {
+              count: 0,
+              severityTotal: 0,
+              severityCount: 0,
+            };
+            const averageSeverity = summary.severityCount
+              ? (summary.severityTotal / summary.severityCount).toFixed(1)
+              : "Not scored";
+            return [summary.count, averageSeverity];
+          }),
+          colorscale: [
+            [0, "#edf1ea"],
+            [0.2, "#c9dfd2"],
+            [0.45, "#82c2a5"],
+            [0.7, "#3e9a79"],
+            [1, "#1d7b5f"],
+          ],
+          zmin: 0,
+          zmax: maxCount || 1,
+          marker: {
+            line: {
+              color: "rgba(255,255,255,0.95)",
+              width: 1.6,
+            },
+          },
+          hovertemplate:
+            "<b>%{text}</b><br>" +
+            "Locations: %{customdata[0]}<br>" +
+            "Avg severity: %{customdata[1]}<extra></extra>",
+          showscale: false,
+        },
+        {
+          type: "scattermap",
+          mode: "markers",
+          lat: rows.map((row) => row.lat),
+          lon: rows.map((row) => row.lon),
+          text: rows.map((row) => row.label),
+          customdata: rows.map((row) => [row.district, row.indicator, row.severityBand]),
+          hovertemplate:
+            "<b>%{text}</b><br>" +
+            "District: %{customdata[0]}<br>" +
+            "Hotspot: %{customdata[1]}<br>" +
+            "Severity: %{customdata[2]}<extra></extra>",
+          marker: {
+            size: rows.map((row) => (row.id === activeLocation?.id ? 11 : 7)),
+            color: rows.map((row) =>
+              row.id === activeLocation?.id ? "#facc15" : indicatorColor(row.indicatorKey)
+            ),
+            line: {
+              color: rows.map((row) =>
+                row.id === activeLocation?.id
+                  ? "#ffffff"
+                  : severityColors[row.severityKey] || severityColors.none
+              ),
+              width: rows.map((row) => (row.id === activeLocation?.id ? 2.5 : 1.4)),
+            },
+            opacity: 0.95,
+          },
+          showlegend: false,
+        },
+      ],
+      {
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        margin: { l: 0, r: 0, t: 0, b: 0 },
+        map: {
+          style: "carto-positron",
+          center: districtMapView.center,
+          zoom: districtMapView.zoom,
         },
       },
       { responsive: true, displayModeBar: false }
@@ -905,6 +1117,7 @@
     renderStats(scopedRows);
     renderCategoryStats(scopedRows);
     renderGeoChart(scopedRows);
+    renderDistrictChart(scopedRows);
     renderIndicatorChart(scopedRows);
     renderSeverityChart(scopedRows);
     renderCategoryChart(scopedRows);
@@ -923,6 +1136,7 @@
   function bindChartEvents() {
     const indicatorChart = document.getElementById(chartIds.indicator);
     const geoChart = document.getElementById(chartIds.geo);
+    const districtChart = document.getElementById(chartIds.district);
     if (indicatorChart && !indicatorChart.dataset.bound) {
       indicatorChart.on("plotly_click", (event) => {
         const point = event?.points?.[0];
@@ -946,6 +1160,21 @@
         }
       });
       geoChart.dataset.bound = "1";
+    }
+    if (districtChart && !districtChart.dataset.bound) {
+      districtChart.on("plotly_click", (event) => {
+        const point = event?.points?.[0];
+        if (!point || point.data?.type !== "scattermap") return;
+        const row = getScopedRows()[point.pointIndex];
+        if (row?.id) {
+          selectLocation(row.id);
+          const tableRow = document.querySelector(`[data-location-id="${row.id}"]`);
+          if (tableRow) {
+            tableRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          }
+        }
+      });
+      districtChart.dataset.bound = "1";
     }
   }
 
@@ -1097,10 +1326,12 @@
 
   Promise.all([
     fetchJson(window.PGIS.locationsUrl),
+    fetchJson(window.PGIS.districtsUrl).catch(() => ({ features: [] })),
     fetchJson(window.PGIS.indicatorApiUrl).catch(() => ({ results: [] })),
   ])
-    .then(([geojson, votePayload]) => {
+    .then(([geojson, districtPayload, votePayload]) => {
       state.rows = buildRows(geojson);
+      state.districtFeatures = districtPayload.features || [];
       state.indicatorColors = buildIndicatorColorMap(state.rows);
       state.votes = (votePayload.results || []).map((row) => ({
         indicatorKey: normalizeIssueLabel(row.indicator),

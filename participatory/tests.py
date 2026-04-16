@@ -56,3 +56,57 @@ class DashboardDistrictFilterTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["current"]["district"], "Salima")
         self.assertEqual(response.context["filtered_count"], 1)
+
+
+class DistrictBoundaryApiTests(TestCase):
+    def test_district_boundary_endpoint_returns_all_districts_and_marks_matches(self):
+        Location.objects.create(
+            external_id="pt_salima",
+            name="pt_salima",
+            label="Point Salima",
+            district_key="salima",
+            district="Salima",
+            indicator="erosion",
+            attribute_2="severity=3",
+            severity=3,
+            latitude=-13.7,
+            longitude=34.3,
+            source_file="source_salima.shp",
+        )
+        Location.objects.create(
+            external_id="pt_mchinji",
+            name="pt_mchinji",
+            label="Point Mchinji",
+            district_key="mchinji",
+            district="Mchinji",
+            indicator="flood",
+            attribute_2="severity=5",
+            severity=5,
+            latitude=-13.8,
+            longitude=32.9,
+            source_file="source_mchinji.shp",
+        )
+
+        response = self.client.get(
+            reverse("district_boundaries_geojson"),
+            {"district": "Salima"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertGreater(payload["count"], 1)
+        self.assertEqual(payload["matched_count"], 1)
+
+        salima_feature = next(
+            feature
+            for feature in payload["features"]
+            if feature["properties"]["district"] == "Salima"
+        )
+        mchinji_feature = next(
+            feature
+            for feature in payload["features"]
+            if feature["properties"]["district"] == "Mchinji"
+        )
+
+        self.assertTrue(salima_feature["properties"]["is_matched"])
+        self.assertFalse(mchinji_feature["properties"]["is_matched"])

@@ -1,5 +1,8 @@
+import json
 import re
 from collections import Counter
+from functools import lru_cache
+from pathlib import Path
 
 from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -54,6 +57,23 @@ INDICATOR_CATEGORY_KEYS = {
     "Socio-economic Hotspots": "governance",
     "Intervention Areas": "other",
 }
+DISTRICT_NAME_ALIASES = {
+    "mongochi": "mangochi",
+}
+
+
+def _normalize_district_name(value: str) -> str:
+    normalized = re.sub(r"\s+", " ", (value or "").strip().lower())
+    return DISTRICT_NAME_ALIASES.get(normalized, normalized)
+
+
+@lru_cache(maxsize=1)
+def _load_malawi_district_boundaries() -> list[dict[str, object]]:
+    boundary_path = Path(__file__).resolve().parent.parent / "geoBoundaries-MWI-ADM2.geojson"
+    with boundary_path.open(encoding="utf-8") as geojson_file:
+        payload = json.load(geojson_file)
+
+    return payload.get("features", [])
 
 
 def _normalize_category(value: str) -> str:
@@ -435,6 +455,47 @@ def locations_geojson(request: HttpRequest) -> JsonResponse:
             "type": "FeatureCollection",
             "count": queryset.count(),
             "returned": len(features),
+            "features": features,
+        }
+    )
+
+
+@require_GET
+def district_boundaries_geojson(request: HttpRequest) -> JsonResponse:
+    queryset = _apply_location_filters(request)
+    district_names = {
+        _normalize_district_name(district)
+        for district in queryset.exclude(district="").values_list("district", flat=True).distinct()
+        if district
+    }
+
+    features = []
+    for feature in _load_malawi_district_boundaries():
+        properties = feature.get("properties", {})
+        shape_name = properties.get("shapeName", "")
+        district_key = _normalize_district_name(shape_name)
+        is_matched = district_key in district_names
+
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    **properties,
+                    "district": shape_name,
+                    "district_key": district_key,
+                    "is_matched": is_matched,
+                },
+                "geometry": feature.get("geometry"),
+            }
+        )
+
+    return JsonResponse(
+        {
+            "type": "FeatureCollection",
+            "count": len(features),
+            "matched_count": sum(
+                1 for feature in features if feature["properties"].get("is_matched")
+            ),
             "features": features,
         }
     )
