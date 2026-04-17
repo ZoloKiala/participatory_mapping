@@ -343,7 +343,13 @@ def _apply_location_filters_from_params(params):
                 source_file_query |= Q(source_file__icontains=f"{token}_")
         queryset = queryset.filter(source_file_query)
     if q:
-        queryset = queryset.filter(label__icontains=q)
+        search_query = (
+            Q(label__icontains=q)
+            | Q(name__icontains=q)
+            | Q(indicator__icontains=q)
+            | Q(district__icontains=q)
+        )
+        queryset = queryset.filter(search_query)
 
     if severity in {"1", "3", "5"}:
         queryset = queryset.filter(severity=int(severity))

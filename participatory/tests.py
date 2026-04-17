@@ -110,3 +110,62 @@ class DistrictBoundaryApiTests(TestCase):
 
         self.assertTrue(salima_feature["properties"]["is_matched"])
         self.assertFalse(mchinji_feature["properties"]["is_matched"])
+
+
+class DashboardSearchTests(TestCase):
+    def test_search_matches_label_name_indicator_and_district_fields(self):
+        Location.objects.create(
+            external_id="pt_label",
+            name="pt_label",
+            label="Salima - borehole",
+            district_key="salima",
+            district="Salima",
+            indicator="borehole",
+            attribute_2="severity=3",
+            severity=3,
+            latitude=-13.7,
+            longitude=34.3,
+            source_file="older_men_source.shp",
+        )
+        Location.objects.create(
+            external_id="pt_name",
+            name="marker_alpha",
+            label="Point two",
+            district_key="mchinji",
+            district="Mchinji",
+            indicator="erosion",
+            attribute_2="severity=2",
+            severity=2,
+            latitude=-13.8,
+            longitude=32.9,
+            source_file="older_women_source.shp",
+        )
+        Location.objects.create(
+            external_id="pt_indicator",
+            name="pt_indicator",
+            label="Point three",
+            district_key="kasungu",
+            district="Kasungu",
+            indicator="seasonal stream",
+            attribute_2="severity=4",
+            severity=4,
+            latitude=-13.1,
+            longitude=33.4,
+            source_file="younger_men_source.shp",
+        )
+
+        response = self.client.get(reverse("dashboard"), {"q": "stream"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["filtered_count"], 1)
+        self.assertEqual(response.context["current"]["q"], "stream")
+
+        response = self.client.get(reverse("dashboard"), {"q": "marker_alpha"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["filtered_count"], 1)
+
+        response = self.client.get(reverse("dashboard"), {"q": "Salima"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["filtered_count"], 1)
