@@ -760,6 +760,60 @@ h3 {
   font-size: clamp(0.96rem, 0.88rem + 0.32vw, 1.04rem);
 }
 
+.dashboard-brandbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(29, 43, 40, 0.14);
+  border-radius: 14px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(247, 241, 230, 0.88));
+  box-shadow:
+    0 10px 24px rgba(18, 28, 27, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+.dashboard-logo {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.dashboard-logo--iwmi {
+  width: min(122px, 34vw);
+  flex: 0 0 auto;
+  border-radius: 8px;
+}
+
+.dashboard-brand-divider {
+  width: 1px;
+  align-self: stretch;
+  background: linear-gradient(180deg, rgba(29, 123, 95, 0.05), rgba(29, 123, 95, 0.3), rgba(29, 123, 95, 0.05));
+}
+
+.dashboard-logo-mark {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dashboard-logo-kicker {
+  color: var(--accent);
+  font-size: var(--type-kicker);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dashboard-logo-mark strong {
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  font-size: clamp(0.98rem, 0.9rem + 0.35vw, 1.12rem);
+  line-height: 1.15;
+}
+
 .title-box {
   position: relative;
   margin: 0 0 12px;
@@ -1311,6 +1365,15 @@ md-icon {
     gap: 12px;
   }
 
+  .dashboard-brandbar {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .dashboard-logo--iwmi {
+    width: min(108px, 36vw);
+  }
+
   .focus-strip,
   .category-breakdown-summary,
   .top-indicator-row {
@@ -1363,6 +1426,15 @@ md-icon {
   .panel,
   .dashboard-wrap {
     padding: 12px;
+  }
+
+  .dashboard-brandbar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .dashboard-brand-divider {
+    display: none;
   }
 
   .dashboard-hero,
