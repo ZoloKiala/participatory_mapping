@@ -60,11 +60,54 @@ INDICATOR_CATEGORY_KEYS = {
 DISTRICT_NAME_ALIASES = {
     "mongochi": "mangochi",
 }
+CATEGORY_SOURCE_FILE_ALIASES = {
+    "Older_Men": [
+        "Older_Men",
+        "Men_Older_Than_40",
+    ],
+    "Older_Women": [
+        "Older_Women",
+        "Women_Older_Than_40",
+    ],
+    "Younger_Men": [
+        "Younger_Men",
+        "Young_Men",
+        "Men_Less_Than_40",
+    ],
+    "Younger_Women": [
+        "Younger_Women",
+        "Young_Women",
+        "Women_Less_Than_40",
+    ],
+}
+CATEGORY_SOURCE_FILE_PATTERNS = {
+    category: [
+        re.compile(rf"(^|[/_]){re.escape(alias.lower())}([/_.]|$)")
+        for alias in aliases
+    ]
+    for category, aliases in CATEGORY_SOURCE_FILE_ALIASES.items()
+}
 
 
 def _normalize_district_name(value: str) -> str:
     normalized = re.sub(r"\s+", " ", (value or "").strip().lower())
     return DISTRICT_NAME_ALIASES.get(normalized, normalized)
+
+
+def _participant_category_from_source_file(source_file: str) -> str:
+    value = (source_file or "").replace("-", "_").replace(" ", "_").lower()
+    if not value:
+        return ""
+
+    for category, patterns in CATEGORY_SOURCE_FILE_PATTERNS.items():
+        if any(pattern.search(value) for pattern in patterns):
+            return category
+
+    match = CATEGORY_RE.search(source_file or "")
+    if match:
+        return _normalize_category(match.group(0))
+
+    return ""
 
 
 @lru_cache(maxsize=1)
@@ -98,19 +141,15 @@ def _normalize_category(value: str) -> str:
 
 def _category_tokens_for_filter(category: str) -> list[str]:
     normalized = _normalize_category(category)
-    if normalized == "Younger_Men":
-        return ["Younger_Men", "Young_Men"]
-    if normalized == "Younger_Women":
-        return ["Younger_Women", "Young_Women"]
-    return [normalized]
+    return CATEGORY_SOURCE_FILE_ALIASES.get(normalized, [normalized])
 
 
 def _available_categories() -> list[str]:
     categories = set()
     for source_file in Location.objects.exclude(source_file="").values_list("source_file", flat=True):
-        match = CATEGORY_RE.search(source_file or "")
-        if match:
-            categories.add(_normalize_category(match.group(0)))
+        category = _participant_category_from_source_file(source_file)
+        if category:
+            categories.add(category)
     return sorted(categories)
 
 

@@ -2,6 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import Location
+from .views import _available_categories
 
 
 class LocationModelTests(TestCase):
@@ -169,3 +170,52 @@ class DashboardSearchTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["filtered_count"], 1)
+
+
+class ParticipantCategoryParsingTests(TestCase):
+    def test_lilongwe_source_files_are_included_in_category_detection_and_filtering(self):
+        Location.objects.create(
+            external_id="pt_lil_older_men",
+            name="pt_lil_older_men",
+            label="Lilongwe older men",
+            district_key="lilongwe",
+            district="Lilongwe",
+            indicator="erosion",
+            attribute_2="severity=3",
+            severity=3,
+            latitude=-14.0,
+            longitude=33.4,
+            source_file="Lilongwe/Men_Older_Than_40_Lilongwe.shp",
+        )
+        Location.objects.create(
+            external_id="pt_lil_younger_women",
+            name="pt_lil_younger_women",
+            label="Lilongwe younger women",
+            district_key="lilongwe",
+            district="Lilongwe",
+            indicator="flood",
+            attribute_2="severity=5",
+            severity=5,
+            latitude=-14.1,
+            longitude=33.5,
+            source_file="Lilongwe/Women_Less_than_40_Lilongwe.shp",
+        )
+
+        self.assertEqual(
+            _available_categories(),
+            ["Older_Men", "Younger_Women"],
+        )
+
+        older_men_response = self.client.get(
+            reverse("locations_geojson"),
+            {"district": "Lilongwe", "category": "Older_Men"},
+        )
+        younger_women_response = self.client.get(
+            reverse("locations_geojson"),
+            {"district": "Lilongwe", "category": "Younger_Women"},
+        )
+
+        self.assertEqual(older_men_response.status_code, 200)
+        self.assertEqual(younger_women_response.status_code, 200)
+        self.assertEqual(older_men_response.json()["count"], 1)
+        self.assertEqual(younger_women_response.json()["count"], 1)

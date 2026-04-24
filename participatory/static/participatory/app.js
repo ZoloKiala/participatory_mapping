@@ -421,11 +421,25 @@
   }
 
   function participantCategory(sourceFile) {
-    const value = (sourceFile || "").toString().toLowerCase();
-    if (value.includes("older_men")) return "Older men";
-    if (value.includes("older_women")) return "Older women";
-    if (value.includes("younger_men") || value.includes("young_men")) return "Younger men";
-    if (value.includes("younger_women") || value.includes("young_women")) return "Younger women";
+    const value = (sourceFile || "")
+      .toString()
+      .replace(/[-\s]+/g, "_")
+      .toLowerCase();
+    const hasToken = (token) =>
+      new RegExp(`(^|[/_])${token}([/_.]|$)`).test(value);
+
+    if (hasToken("older_men") || hasToken("men_older_than_40")) return "Older men";
+    if (hasToken("older_women") || hasToken("women_older_than_40")) return "Older women";
+    if (hasToken("younger_men") || hasToken("young_men") || hasToken("men_less_than_40")) {
+      return "Younger men";
+    }
+    if (
+      hasToken("younger_women") ||
+      hasToken("young_women") ||
+      hasToken("women_less_than_40")
+    ) {
+      return "Younger women";
+    }
     return "Uncategorized";
   }
 
