@@ -46,7 +46,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260415-m3">
+  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260512-sidebar-toggle-3">
 </head>
 <body>
   <div id="app-loader" class="app-loader" role="status" aria-live="polite" aria-label="Loading dashboard data">
@@ -75,7 +75,7 @@
     </div>
   </div>
 
-  <main class="layout">
+  <main class="layout" id="dashboard-layout">
     <section class="panel" id="sidebar-panel">
       <div class="dashboard-brandbar" aria-label="Dashboard branding">
         <img
@@ -96,6 +96,18 @@
       <p class="muted" id="sidebar-count">Loaded locations: {{ filtered_count }}</p>
 
       <form method="get" class="filters" id="filters-form">
+        <section class="onboarding-card" aria-labelledby="dashboard-help-title">
+          <span class="onboarding-icon" aria-hidden="true"><md-icon>tips_and_updates</md-icon></span>
+          <div>
+            <h2 id="dashboard-help-title">How to use this dashboard</h2>
+            <p>
+              Explore community-identified soil, water, land-use, and livelihood hotspots across districts.
+              Use the filters to compare hotspot types, severity levels, participant groups, and priority
+              intervention areas.
+            </p>
+          </div>
+        </section>
+
         <div class="filters-header">
           <span class="filters-kicker">Controls</span>
           <h2>Filter hotspots</h2>
@@ -113,6 +125,16 @@
 
         <fieldset class="m3-fieldset">
           <legend>Environmental Hotspots</legend>
+          <md-outlined-text-field
+            type="search"
+            id="indicator-filter-search"
+            label="Search hotspot types"
+            placeholder="Type flood, erosion, dam..."
+            class="field-full"
+          >
+            <md-icon slot="leading-icon">search</md-icon>
+          </md-outlined-text-field>
+          <div class="selected-filter-chips" id="selected-filter-chips" aria-live="polite"></div>
           {% for group in indicator_option_groups %}
             <details class="indicator-group indicator-group--{{ group.key }}" data-indicator-group="{{ group.name }}">
               <summary class="muted">{{ group.name }}</summary>
@@ -199,15 +221,14 @@
             <md-icon slot="icon" aria-hidden="true">tune</md-icon>
             Apply Filters
           </md-filled-button>
-          <md-outlined-icon-button
+          <md-outlined-button
             href="/"
             data-skip-loader="1"
-            aria-label="Reset filters"
-            title="Reset filters"
             class="reset-btn"
           >
-            <md-icon>restart_alt</md-icon>
-          </md-outlined-icon-button>
+            <md-icon slot="icon" aria-hidden="true">restart_alt</md-icon>
+            Reset all filters
+          </md-outlined-button>
         </div>
       </form>
 
@@ -262,6 +283,18 @@
     </section>
 
     <section class="dashboard-wrap">
+      <button
+        type="button"
+        class="sidebar-toggle"
+        id="sidebar-toggle"
+        aria-controls="sidebar-panel"
+        aria-expanded="true"
+        aria-label="Hide filters sidebar"
+        title="Hide filters"
+      >
+        <md-icon class="sidebar-toggle-icon" aria-hidden="true">menu_open</md-icon>
+        <span class="sidebar-toggle-label visually-hidden">Hide filters</span>
+      </button>
       <header class="dashboard-hero">
         <div class="hero-copy-block">
           <div class="hero-title-row">
@@ -274,8 +307,8 @@
             <h2>Hotspot analysis overview</h2>
           </div>
           <p class="muted hero-copy">
-            Explore hotspot patterns, severity clusters, and community selections without the
-            Leaflet map. The charts remain driven by the same filtered location dataset.
+            Explore hotspot patterns through charts, summaries, and district-level views. The charts
+            remain driven by the same filtered location dataset.
           </p>
         </div>
         <div class="search-card">
@@ -299,7 +332,7 @@
           <span class="card-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 4 19 8v8l-7 4-7-4V8l7-4Z" stroke="currentColor" stroke-width="1.7"/><path d="M12 12 19 8M12 12 5 8M12 12v8" stroke="currentColor" stroke-width="1.7"/></svg>
           </span>
-          <span class="stat-label">Visible locations</span>
+          <span class="stat-label">Loaded locations</span>
           <strong class="stat-value" id="stat-total">{{ filtered_count }}</strong>
           <span class="stat-meta">Current filtered dataset</span>
         </article>
@@ -308,7 +341,7 @@
             <svg viewBox="0 0 24 24" fill="none"><path d="M5 7h14M5 12h10M5 17h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="18" cy="17" r="2" fill="currentColor"/></svg>
           </span>
           <span class="stat-label">Distinct hotspot types</span>
-          <strong class="stat-value" id="stat-indicators">-</strong>
+          <strong class="stat-value" id="stat-indicators">Not available</strong>
           <span class="stat-meta">Canonical indicators in view</span>
         </article>
         <article class="stat-card">
@@ -316,7 +349,7 @@
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 4v9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="16" r="4" stroke="currentColor" stroke-width="1.7"/></svg>
           </span>
           <span class="stat-label">Average severity</span>
-          <strong class="stat-value" id="stat-severity">-</strong>
+          <strong class="stat-value" id="stat-severity">Not available</strong>
           <span class="stat-meta">Across visible records</span>
         </article>
         <article class="stat-card">
@@ -324,7 +357,7 @@
             <svg viewBox="0 0 24 24" fill="none"><path d="M4 18h16M7 18V8m5 10V5m5 13v-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
           </span>
           <span class="stat-label">Dominant category</span>
-          <strong class="stat-value" id="stat-category">-</strong>
+          <strong class="stat-value" id="stat-category">Not available</strong>
           <span class="stat-meta">Most common hotspot family</span>
         </article>
       </section>
@@ -429,6 +462,22 @@
         </div>
         <div class="table-pagination" id="locations-pagination" aria-label="Location detail pagination"></div>
       </section>
+
+      <section class="about-data-card" aria-labelledby="about-data-title">
+        <div class="section-head">
+          <h3 id="about-data-title"><span class="head-icon" aria-hidden="true"><md-icon>info</md-icon></span>About this data</h3>
+        </div>
+        <p>
+          This dashboard summarizes community-identified hotspot locations recorded during participatory
+          mapping activities in Malawi districts. Participant group labels come from the contributed source
+          files, and severity scores describe the relative concern recorded for each hotspot.
+        </p>
+        <p>
+          The dataset was loaded from the project location records and may not include every community,
+          season, or local condition. Treat the results as planning evidence to review with communities and
+          technical teams before selecting interventions.
+        </p>
+      </section>
     </section>
   </main>
 
@@ -440,6 +489,6 @@
       indicatorApiUrl: "{% url 'selection_results' %}?{{ query_string|safe }}"
     };
   </script>
-  <script src="{% static 'participatory/app.js' %}?v=20260416-participant-matrix"></script>
+  <script src="{% static 'participatory/app.js' %}?v=20260512-sidebar-toggle-3"></script>
 </body>
 </html>

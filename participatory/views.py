@@ -45,7 +45,7 @@ INDICATOR_CATEGORY_ORDER = [
     "Hydrological and Water Stress Hotspots",
     "Soil Related Hotspots",
     "Crop and Productivity Hotspots",
-    "Land  Use and Ecologcal Hotspots",
+    "Land Use and Ecological Hotspots",
     "Socio-economic Hotspots",
     "Intervention Areas",
 ]
@@ -53,7 +53,7 @@ INDICATOR_CATEGORY_KEYS = {
     "Hydrological and Water Stress Hotspots": "water",
     "Soil Related Hotspots": "soil",
     "Crop and Productivity Hotspots": "productivity",
-    "Land  Use and Ecologcal Hotspots": "ecosystem",
+    "Land Use and Ecological Hotspots": "ecosystem",
     "Socio-economic Hotspots": "governance",
     "Intervention Areas": "other",
 }
@@ -304,7 +304,7 @@ def _indicator_category(indicator: str) -> str:
             "deforestation",
         ]
     ):
-        return "Land  Use and Ecologcal Hotspots"
+        return "Land Use and Ecological Hotspots"
 
     if any(token in value for token in ["grazing", "pasture"]):
         return "Crop and Productivity Hotspots"

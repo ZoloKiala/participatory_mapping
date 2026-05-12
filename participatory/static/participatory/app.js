@@ -20,6 +20,43 @@
 
   window.setTimeout(hideLoader, 7000);
 
+  (function setupSidebarToggle() {
+    const layout = document.getElementById("dashboard-layout");
+    const toggle = document.getElementById("sidebar-toggle");
+    if (!layout || !toggle) return;
+
+    const storageKey = "pgis_sidebar_collapsed";
+    const icon = toggle.querySelector(".sidebar-toggle-icon");
+    const label = toggle.querySelector(".sidebar-toggle-label");
+
+    function applyState(collapsed) {
+      layout.classList.toggle("is-sidebar-collapsed", collapsed);
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      toggle.setAttribute(
+        "aria-label",
+        collapsed ? "Show filters sidebar" : "Hide filters sidebar"
+      );
+      toggle.title = collapsed ? "Show filters" : "Hide filters";
+      if (icon) icon.textContent = collapsed ? "menu" : "menu_open";
+      if (label) label.textContent = collapsed ? "Show filters sidebar" : "Hide filters sidebar";
+    }
+
+    let initialCollapsed = false;
+    try {
+      initialCollapsed = window.localStorage.getItem(storageKey) === "1";
+    } catch (e) {}
+    applyState(initialCollapsed);
+
+    toggle.addEventListener("click", () => {
+      const collapsed = !layout.classList.contains("is-sidebar-collapsed");
+      applyState(collapsed);
+      try {
+        window.localStorage.setItem(storageKey, collapsed ? "1" : "0");
+      } catch (e) {}
+      window.dispatchEvent(new Event("resize"));
+    });
+  })();
+
   const state = {
     rows: [],
     districtFeatures: [],
@@ -45,7 +82,7 @@
     "Hydrological and Water Stress Hotspots": "#1d7b5f",
     "Soil Related Hotspots": "#ef7f45",
     "Crop and Productivity Hotspots": "#d9485f",
-    "Land  Use and Ecologcal Hotspots": "#7b5af0",
+    "Land Use and Ecological Hotspots": "#7b5af0",
     "Socio-economic Hotspots": "#0f4c81",
     "Intervention Areas": "#b78b28",
   };
@@ -306,7 +343,7 @@
       value.includes("riparian") ||
       value.includes("deforestation")
     ) {
-      return "Land  Use and Ecologcal Hotspots";
+      return "Land Use and Ecological Hotspots";
     }
 
     return "Intervention Areas";
@@ -572,19 +609,20 @@
       .filter((value) => typeof value === "number");
     const averageSeverity = severityValues.length
       ? (severityValues.reduce((sum, value) => sum + value, 0) / severityValues.length).toFixed(1)
-      : "-";
+      : "Not available";
     const topCategory = topRowsByCount(scopedRows, (row) => row.category, 1)[0];
 
-    setText("stat-total", `${scopedRows.length}`);
-    setText("stat-indicators", `${new Set(scopedRows.map((row) => row.indicatorKey).filter(Boolean)).size}`);
+    setText("stat-total", scopedRows.length ? `${scopedRows.length}` : "Not available");
+    const indicatorCount = new Set(scopedRows.map((row) => row.indicatorKey).filter(Boolean)).size;
+    setText("stat-indicators", indicatorCount ? `${indicatorCount}` : "Not available");
     setText("stat-severity", averageSeverity);
-    setText("stat-category", topCategory ? topCategory.label : "-");
+    setText("stat-category", topCategory ? topCategory.label : "Not available");
     setText("sidebar-count", `Loaded locations: ${scopedRows.length}`);
   }
 
   function renderGeoChart(rows) {
     if (!rows.length) {
-      renderEmptyChart(chartIds.geo, "No locations match the current filters.");
+      renderEmptyChart(chartIds.geo, "No locations match the selected filters. Try adjusting your filters.");
       return;
     }
 
@@ -799,7 +837,7 @@
   function renderIndicatorChart(rows) {
     const summary = topRowsByCount(rows, (row) => row.indicatorKey, 12);
     if (!summary.length) {
-      renderEmptyChart(chartIds.indicator, "No hotspot indicators available.");
+      renderEmptyChart(chartIds.indicator, "No locations match the selected filters. Try adjusting your filters.");
       return;
     }
 
@@ -847,7 +885,7 @@
       .sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label));
 
     if (!summary.length) {
-      renderEmptyChart(chartIds.severity, "No severity data available.");
+      renderEmptyChart(chartIds.severity, "No locations match the selected filters. Try adjusting your filters.");
       return;
     }
 
@@ -862,12 +900,15 @@
           sort: false,
           marker: { colors: summary.map((item) => colorMap[item.label]) },
           textinfo: "label+percent",
+          textposition: "outside",
+          automargin: true,
+          insidetextorientation: "horizontal",
           hovertemplate: "%{label}: %{value} locations<extra></extra>",
         },
       ],
       {
         paper_bgcolor: "rgba(0,0,0,0)",
-        margin: { l: 16, r: 16, t: 16, b: 16 },
+        margin: { l: 40, r: 40, t: 40, b: 40 },
         showlegend: false,
       },
       { responsive: true, displayModeBar: false }
@@ -877,7 +918,7 @@
   function renderCategoryChart(rows) {
     const summary = topRowsByCount(rows, (row) => row.category, 10);
     if (!summary.length) {
-      renderEmptyChart(chartIds.category, "No category data available.");
+      renderEmptyChart(chartIds.category, "No locations match the selected filters. Try adjusting your filters.");
       return;
     }
 
@@ -987,7 +1028,7 @@
     const pageRows = sortedRows.slice(startIndex, startIndex + tableRowsPerPage);
 
     if (!pageRows.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No locations match the current focus.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No locations match the selected filters. Try adjusting your filters.</td></tr>';
       if (pagination) {
         pagination.innerHTML = "";
       }
@@ -1058,7 +1099,7 @@
     if (!container) return;
 
     if (!rows.length) {
-      container.innerHTML = '<div class="category-stat-empty">No category stats available for the current focus.</div>';
+      container.innerHTML = '<div class="category-stat-empty">No locations match the selected filters. Try adjusting your filters.</div>';
       return;
     }
 
@@ -1080,7 +1121,7 @@
     const total = summary.reduce((sum, item) => sum + item.count, 0);
 
     if (!total) {
-      container.innerHTML = '<div class="category-stat-empty">No participant groups matched the current focus.</div>';
+      container.innerHTML = '<div class="category-stat-empty">No participant groups matched the selected filters.</div>';
       return;
     }
 
@@ -1290,20 +1331,6 @@
     const groups = Array.from(document.querySelectorAll("details.indicator-group"));
     if (!groups.length) return;
 
-    const selectedIndicators = Array.from(
-      document.querySelectorAll('md-checkbox[name="indicator"]')
-    ).filter((cb) => cb.checked);
-    if (selectedIndicators.length) {
-      const selectedGroups = new Set();
-      selectedIndicators.forEach((input) => {
-        const group = input.closest("details.indicator-group");
-        if (group) selectedGroups.add(group);
-      });
-      selectedGroups.forEach((group) => {
-        group.open = true;
-      });
-    }
-
     groups.forEach((group) => {
       group.addEventListener("toggle", () => {
         if (!group.open) return;
@@ -1318,6 +1345,78 @@
         });
       });
     });
+  }
+
+  function setupIndicatorSearch() {
+    const search = document.getElementById("indicator-filter-search");
+    const groups = Array.from(document.querySelectorAll("details.indicator-group"));
+    if (!search || !groups.length) return;
+
+    const applySearch = () => {
+      const query = (search.value || "").toString().trim().toLowerCase();
+      groups.forEach((group) => {
+        let visibleCount = 0;
+        group.querySelectorAll(".indicator-option").forEach((option) => {
+          const label = (option.textContent || "").trim().toLowerCase();
+          const isGroupToggle = option.classList.contains("indicator-option--all");
+          const matches = !query || label.includes(query) || isGroupToggle;
+          option.hidden = query && !matches;
+          if (!isGroupToggle && matches) visibleCount += 1;
+        });
+        const groupMatches = !query || visibleCount > 0 || (group.dataset.indicatorGroup || "").toLowerCase().includes(query);
+        group.hidden = !groupMatches;
+        if (query && groupMatches) {
+          group.open = true;
+        }
+      });
+    };
+
+    search.addEventListener("input", applySearch);
+    applySearch();
+  }
+
+  function setupSelectedFilterChips() {
+    const container = document.getElementById("selected-filter-chips");
+    const filterForm = document.querySelector("form.filters");
+    if (!container || !filterForm) return;
+
+    const chipForCheckbox = (input) => {
+      const option = input.closest("label");
+      const label = option ? (option.textContent || "").trim().replace(/\s+/g, " ") : input.value;
+      return { label, remove: () => { input.checked = false; input.dispatchEvent(new Event("change", { bubbles: true })); } };
+    };
+
+    const renderChips = () => {
+      container.innerHTML = "";
+      const chips = Array.from(filterForm.querySelectorAll('md-checkbox[name="indicator"], md-checkbox[name="category"]'))
+        .filter((input) => input.checked)
+        .map(chipForCheckbox);
+
+      if (!chips.length) {
+        container.hidden = true;
+        return;
+      }
+
+      container.hidden = false;
+      chips.forEach((chip) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "filter-chip";
+        button.setAttribute("aria-label", `Remove ${chip.label}`);
+        button.innerHTML = `<span></span><md-icon aria-hidden="true">close</md-icon>`;
+        button.querySelector("span").textContent = chip.label;
+        button.addEventListener("click", () => {
+          chip.remove();
+          renderChips();
+        });
+        container.append(button);
+      });
+    };
+
+    filterForm.querySelectorAll('md-checkbox[name="indicator"], md-checkbox[name="category"]').forEach((input) => {
+      input.addEventListener("change", renderChips);
+    });
+    renderChips();
   }
 
   function setupIndicatorGroupToggles() {
@@ -1339,6 +1438,7 @@
         const shouldSelectAll = toggle.checked;
         inputs.forEach((input) => {
           input.checked = shouldSelectAll;
+          input.dispatchEvent(new Event("change", { bubbles: true }));
         });
         syncToggleState();
       });
@@ -1389,7 +1489,9 @@
 
   setupFilterForm();
   setupIndicatorGroupsCollapsible();
+  setupIndicatorSearch();
   setupIndicatorGroupToggles();
+  setupSelectedFilterChips();
   setupSkipLoaderLinks();
   setupHotspotFocusControls();
 
@@ -1415,8 +1517,10 @@
       console.error("Failed to load dashboard data", error);
       Object.values(chartIds).forEach((id) => {
         if (id === chartIds.votes) return;
-        renderEmptyChart(id, "Dashboard data could not be loaded.");
+        renderEmptyChart(id, "We couldn't load this section. Please refresh the page or try again later.");
       });
+      renderStats([]);
+      renderCategoryStats([]);
       const votesCard = document.getElementById("votes-card");
       if (votesCard) {
         votesCard.hidden = true;
