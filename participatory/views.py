@@ -17,12 +17,16 @@ INDICATOR_TYPO_FIXES = {
     "permamnent": "permanent",
     "permenent": "permanent",
     "permanant": "permanent",
+    "permaent": "permanent",
     "seassonal": "seasonal",
+    "seasonsl": "seasonal",
     "confict": "conflict",
     "nutirent": "nutrient",
     "fertilty": "fertility",
     "grazzing": "grazing",
+    "grazery": "grazing",
     "gulley": "gully",
+    "agricultue": "agriculture",
 }
 INDICATOR_TOKEN_SINGULAR = {
     "conflicts": "conflict",
@@ -60,6 +64,40 @@ INDICATOR_CATEGORY_KEYS = {
 DISTRICT_NAME_ALIASES = {
     "mongochi": "mangochi",
 }
+DISTRICT_COUNTRY = {
+    "Chikwawa": "Malawi",
+    "Lilongwe": "Malawi",
+    "Mangochi": "Malawi",
+    "Mchinji": "Malawi",
+    "Mulanje": "Malawi",
+    "Salima": "Malawi",
+    "Chibombo": "Zambia",
+    "Chipata": "Zambia",
+    "Kapiri Mposhi": "Zambia",
+    "Kasenengwa": "Zambia",
+    "Monze": "Zambia",
+    "Mpongwe": "Zambia",
+    "Mumbwa": "Zambia",
+    "Petauke": "Zambia",
+    "Shibuyunji": "Zambia",
+}
+COUNTRIES_ORDER = ["Malawi", "Zambia"]
+
+
+def _country_for_district(district: str) -> str:
+    return DISTRICT_COUNTRY.get((district or "").strip(), "")
+
+
+def _districts_for_country(country: str) -> list[str]:
+    if not country:
+        return list(DISTRICT_COUNTRY)
+    return [
+        district
+        for district, mapped in DISTRICT_COUNTRY.items()
+        if mapped == country
+    ]
+
+
 CATEGORY_SOURCE_FILE_ALIASES = {
     "Older_Men": [
         "Older_Men",
@@ -117,6 +155,21 @@ def _load_malawi_district_boundaries() -> list[dict[str, object]]:
         payload = json.load(geojson_file)
 
     return payload.get("features", [])
+
+
+@lru_cache(maxsize=1)
+def _load_zambia_district_boundaries() -> list[dict[str, object]]:
+    boundary_path = Path(__file__).resolve().parent.parent / "geoBoundaries-ZMB-ADM2.geojson"
+    if not boundary_path.exists():
+        return []
+    with boundary_path.open(encoding="utf-8") as geojson_file:
+        payload = json.load(geojson_file)
+
+    return payload.get("features", [])
+
+
+def _all_district_boundaries() -> list[dict[str, object]]:
+    return list(_load_malawi_district_boundaries()) + list(_load_zambia_district_boundaries())
 
 
 def _normalize_category(value: str) -> str:
@@ -191,6 +244,7 @@ def _normalize_indicator(value: str) -> str:
         "forest seasonal",
         "deforestation sacred forest",
         "sacred forest reduction",
+        "sacred forests",
     }:
         normalized = "sacred forest"
     if normalized in {"yield", "yields", "yield decline", "yield loss"}:
@@ -354,6 +408,7 @@ def _canonical_indicator_counts(queryset, limit: int = 15) -> list[dict[str, obj
 def _apply_location_filters_from_params(params):
     queryset = Location.objects.all()
 
+    country = params.get("country", "").strip()
     district = params.get("district", "").strip()
     indicators = [value.strip() for value in params.getlist("indicator") if value.strip()]
     categories = [_normalize_category(value) for value in params.getlist("category") if value.strip()]
@@ -363,8 +418,17 @@ def _apply_location_filters_from_params(params):
     severity_min = params.get("severity_min", "").strip()
     severity_max = params.get("severity_max", "").strip()
 
+    if country:
+        country_districts = _districts_for_country(country)
+        if country_districts:
+            queryset = queryset.filter(district__in=country_districts)
     if district:
-        queryset = queryset.filter(district=district)
+        if country and district not in _districts_for_country(country):
+            # District selection doesn't belong to the chosen country — ignore
+            # it rather than returning zero rows.
+            district = ""
+        else:
+            queryset = queryset.filter(district=district)
     if indicators:
         grouped_indicators = _indicator_groups()
         expanded_indicators = set()
@@ -416,13 +480,35 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     districts = list(
         Location.objects.order_by("district").values_list("district", flat=True).distinct()
     )
+    available_countries = [
+        country
+        for country in COUNTRIES_ORDER
+        if any(_country_for_district(d) == country for d in districts)
+    ]
     params = request.GET.copy()
+    selected_country = params.get("country", "").strip()
     selected_district = params.get("district", "").strip()
+
+    # If the chosen district doesn't belong to the chosen country, drop the
+    # mismatch so the user isn't shown an empty result set.
+    if selected_country and selected_district and _country_for_district(selected_district) != selected_country:
+        selected_district = ""
+        params["district"] = ""
+
     default_salima = next((district for district in districts if district.lower() == "salima"), "")
 
-    if not request.GET and not selected_district and default_salima:
+    if not request.GET and not selected_country and not selected_district and default_salima:
         selected_district = default_salima
         params["district"] = default_salima
+        selected_country = _country_for_district(default_salima)
+        params["country"] = selected_country
+
+    # Always send every district to the client (each tagged with its country)
+    # so the country dropdown can filter them without a page reload.
+    district_options = [
+        {"value": district, "country": _country_for_district(district)}
+        for district in districts
+    ]
 
     filtered_qs = _apply_location_filters_from_params(params)
     grouped_indicators = _indicator_groups()
@@ -437,6 +523,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     context = {
         "districts": districts,
+        "district_options": district_options,
+        "countries": available_countries,
         "indicator_option_groups": indicator_option_groups,
         "categories": [
             {"value": category, "label": _format_category_label(category)}
@@ -445,6 +533,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "filtered_count": filtered_qs.count(),
         "indicator_counts": indicator_counts,
         "current": {
+            "country": selected_country,
             "district": selected_district,
             "indicator": (
                 _normalize_indicator(params.get("indicator", "").strip())
@@ -514,8 +603,16 @@ def district_boundaries_geojson(request: HttpRequest) -> JsonResponse:
         if district
     }
 
+    country = request.GET.get("country", "").strip()
+    if country == "Malawi":
+        boundary_source = _load_malawi_district_boundaries()
+    elif country == "Zambia":
+        boundary_source = _load_zambia_district_boundaries()
+    else:
+        boundary_source = _all_district_boundaries()
+
     features = []
-    for feature in _load_malawi_district_boundaries():
+    for feature in boundary_source:
         properties = feature.get("properties", {})
         shape_name = properties.get("shapeName", "")
         district_key = _normalize_district_name(shape_name)

@@ -20,6 +20,40 @@
 
   window.setTimeout(hideLoader, 7000);
 
+  (function setupCountryDistrictLinkage() {
+    const countrySelect = document.getElementById("country-select");
+    const districtSelect = document.getElementById("district-select");
+    if (!countrySelect || !districtSelect) return;
+
+    const options = Array.from(districtSelect.querySelectorAll("md-select-option"));
+
+    function applyCountryFilter() {
+      const country = (countrySelect.value || "").trim();
+      const currentValue = (districtSelect.value || "").trim();
+      let selectedStillVisible = false;
+      options.forEach((option) => {
+        const optionCountry = option.dataset.country || "";
+        const isPlaceholder = option.value === "";
+        const matches = !country || isPlaceholder || optionCountry === country;
+        if (matches) {
+          option.removeAttribute("data-country-hidden");
+          option.disabled = false;
+          if (option.value === currentValue) selectedStillVisible = true;
+        } else {
+          option.setAttribute("data-country-hidden", "true");
+          option.disabled = true;
+        }
+      });
+      if (!selectedStillVisible && currentValue !== "") {
+        districtSelect.value = "";
+      }
+    }
+
+    countrySelect.addEventListener("change", applyCountryFilter);
+    countrySelect.addEventListener("input", applyCountryFilter);
+    applyCountryFilter();
+  })();
+
   (function setupSidebarToggle() {
     const layout = document.getElementById("dashboard-layout");
     const toggle = document.getElementById("sidebar-toggle");

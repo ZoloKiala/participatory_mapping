@@ -46,7 +46,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260512-sidebar-toggle-3">
+  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260523-country-filter-3">
 </head>
 <body>
   <div id="app-loader" class="app-loader" role="status" aria-live="polite" aria-label="Loading dashboard data">
@@ -114,10 +114,29 @@
           <p>Refine the dashboard by district, hotspot type, participant group, and severity.</p>
         </div>
         <div class="field-block">
-          <md-outlined-select name="district" label="District" class="field-full">
-            {% for district in districts %}
-              <md-select-option value="{{ district }}" {% if current.district == district %}selected{% endif %}>
-                <div slot="headline">{{ district }}</div>
+          <md-outlined-select name="country" id="country-select" label="Country" class="field-full">
+            <md-select-option value="" {% if not current.country %}selected{% endif %}>
+              <div slot="headline">All countries</div>
+            </md-select-option>
+            {% for country in countries %}
+              <md-select-option value="{{ country }}" {% if current.country == country %}selected{% endif %}>
+                <div slot="headline">{{ country }}</div>
+              </md-select-option>
+            {% endfor %}
+          </md-outlined-select>
+        </div>
+        <div class="field-block">
+          <md-outlined-select name="district" id="district-select" label="District" class="field-full">
+            <md-select-option value="" {% if not current.district %}selected{% endif %}>
+              <div slot="headline">All districts</div>
+            </md-select-option>
+            {% for option in district_options %}
+              <md-select-option
+                value="{{ option.value }}"
+                data-country="{{ option.country }}"
+                {% if current.district == option.value %}selected{% endif %}
+              >
+                <div slot="headline">{{ option.value }}</div>
               </md-select-option>
             {% endfor %}
           </md-outlined-select>
@@ -489,6 +508,6 @@
       indicatorApiUrl: "{% url 'selection_results' %}?{{ query_string|safe }}"
     };
   </script>
-  <script src="{% static 'participatory/app.js' %}?v=20260512-sidebar-toggle-3"></script>
+  <script src="{% static 'participatory/app.js' %}?v=20260523-country-filter-3"></script>
 </body>
 </html>
