@@ -1257,10 +1257,6 @@ md-outlined-select {
   --md-outlined-select-text-field-container-shape: 12px;
 }
 
-md-select-option[data-country-hidden="true"] {
-  display: none !important;
-}
-
 md-checkbox {
   --md-checkbox-outline-color: var(--md-sys-color-outline);
   --md-checkbox-selected-container-color: var(--md-sys-color-primary);

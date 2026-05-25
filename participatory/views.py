@@ -148,24 +148,32 @@ def _participant_category_from_source_file(source_file: str) -> str:
     return ""
 
 
+def _load_boundary_file(simplified_name: str, raw_name: str) -> list[dict[str, object]]:
+    """Prefer the pre-simplified GeoJSON if present; fall back to the raw file."""
+
+    base = Path(__file__).resolve().parent.parent
+    for candidate in (base / simplified_name, base / raw_name):
+        if candidate.exists():
+            with candidate.open(encoding="utf-8") as geojson_file:
+                payload = json.load(geojson_file)
+            return payload.get("features", [])
+    return []
+
+
 @lru_cache(maxsize=1)
 def _load_malawi_district_boundaries() -> list[dict[str, object]]:
-    boundary_path = Path(__file__).resolve().parent.parent / "geoBoundaries-MWI-ADM2.geojson"
-    with boundary_path.open(encoding="utf-8") as geojson_file:
-        payload = json.load(geojson_file)
-
-    return payload.get("features", [])
+    return _load_boundary_file(
+        "geoBoundaries-MWI-ADM2.simplified.geojson",
+        "geoBoundaries-MWI-ADM2.geojson",
+    )
 
 
 @lru_cache(maxsize=1)
 def _load_zambia_district_boundaries() -> list[dict[str, object]]:
-    boundary_path = Path(__file__).resolve().parent.parent / "geoBoundaries-ZMB-ADM2.geojson"
-    if not boundary_path.exists():
-        return []
-    with boundary_path.open(encoding="utf-8") as geojson_file:
-        payload = json.load(geojson_file)
-
-    return payload.get("features", [])
+    return _load_boundary_file(
+        "geoBoundaries-ZMB-ADM2.simplified.geojson",
+        "geoBoundaries-ZMB-ADM2.geojson",
+    )
 
 
 def _all_district_boundaries() -> list[dict[str, object]]:

@@ -46,7 +46,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260523-country-filter-3">
+  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260525-perf-and-district-filter">
 </head>
 <body>
   <div id="app-loader" class="app-loader" role="status" aria-live="polite" aria-label="Loading dashboard data">
@@ -508,6 +508,6 @@
       indicatorApiUrl: "{% url 'selection_results' %}?{{ query_string|safe }}"
     };
   </script>
-  <script src="{% static 'participatory/app.js' %}?v=20260523-country-filter-3"></script>
+  <script src="{% static 'participatory/app.js' %}?v=20260525-perf-and-district-filter"></script>
 </body>
 </html>

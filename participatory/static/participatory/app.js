@@ -25,25 +25,32 @@
     const districtSelect = document.getElementById("district-select");
     if (!countrySelect || !districtSelect) return;
 
-    const options = Array.from(districtSelect.querySelectorAll("md-select-option"));
+    // Snapshot every option in its original order at startup so we can
+    // physically remove and re-insert nodes when the country changes.
+    // Material Web's md-outlined-select doesn't reliably honor `display:
+    // none` on slotted options, so we rebuild the slotted list instead.
+    const allOptions = Array.from(districtSelect.querySelectorAll("md-select-option"));
 
     function applyCountryFilter() {
       const country = (countrySelect.value || "").trim();
       const currentValue = (districtSelect.value || "").trim();
       let selectedStillVisible = false;
-      options.forEach((option) => {
+
+      allOptions.forEach((option) => {
+        if (option.parentNode === districtSelect) {
+          districtSelect.removeChild(option);
+        }
+      });
+
+      allOptions.forEach((option) => {
         const optionCountry = option.dataset.country || "";
         const isPlaceholder = option.value === "";
         const matches = !country || isPlaceholder || optionCountry === country;
-        if (matches) {
-          option.removeAttribute("data-country-hidden");
-          option.disabled = false;
-          if (option.value === currentValue) selectedStillVisible = true;
-        } else {
-          option.setAttribute("data-country-hidden", "true");
-          option.disabled = true;
-        }
+        if (!matches) return;
+        districtSelect.appendChild(option);
+        if (option.value === currentValue) selectedStillVisible = true;
       });
+
       if (!selectedStillVisible && currentValue !== "") {
         districtSelect.value = "";
       }
