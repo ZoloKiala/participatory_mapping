@@ -69,4 +69,6 @@ Salima A-20260327T211626Z-1-001/
 !preloaded_locations.csv
 !preloaded_locations_zambia.csv
 !geoBoundaries-MWI-ADM2.geojson
+!geoBoundaries-MWI-ADM2.simplified.geojson
 !geoBoundaries-ZMB-ADM2.geojson
+!geoBoundaries-ZMB-ADM2.simplified.geojson
