@@ -46,7 +46,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260525-hide-api-link">
+  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260525-collapsible-filters">
 </head>
 <body>
   <div id="app-loader" class="app-loader" role="status" aria-live="polite" aria-label="Loading dashboard data">
@@ -142,6 +142,13 @@
           </md-outlined-select>
         </div>
 
+        <details class="advanced-filters" {% if current.indicators or current.categories or current.severity or current.q %}open{% endif %}>
+          <summary>
+            <md-icon aria-hidden="true">tune</md-icon>
+            <span>More filters</span>
+            <md-icon class="advanced-chevron" aria-hidden="true">expand_more</md-icon>
+          </summary>
+
         <fieldset class="m3-fieldset">
           <legend>Environmental Hotspots</legend>
           <md-outlined-text-field
@@ -229,6 +236,7 @@
             </md-select-option>
           </md-outlined-select>
         </div>
+        </details>
 
         <div class="filter-actions">
           <md-filled-button
@@ -508,6 +516,6 @@
       indicatorApiUrl: "{% url 'selection_results' %}?{{ query_string|safe }}"
     };
   </script>
-  <script src="{% static 'participatory/app.js' %}?v=20260525-hide-api-link"></script>
+  <script src="{% static 'participatory/app.js' %}?v=20260525-collapsible-filters"></script>
 </body>
 </html>

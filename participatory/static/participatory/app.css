@@ -1328,6 +1328,54 @@ md-icon {
   box-sizing: border-box;
 }
 
+.advanced-filters {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.advanced-filters > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(24, 79, 67, 0.18);
+  background: rgba(255, 255, 255, 0.7);
+  color: #184f43;
+  font-size: var(--type-body-sm);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  user-select: none;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.advanced-filters > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-filters > summary:hover,
+.advanced-filters > summary:focus-visible {
+  background: rgba(29, 123, 95, 0.08);
+  border-color: rgba(29, 123, 95, 0.3);
+  outline: none;
+}
+
+.advanced-filters > summary span {
+  flex: 1;
+}
+
+.advanced-filters > summary .advanced-chevron {
+  font-size: 20px;
+  transition: transform 160ms ease;
+}
+
+.advanced-filters[open] > summary .advanced-chevron {
+  transform: rotate(180deg);
+}
+
 .m3-fieldset > * {
   min-width: 0;
 }
