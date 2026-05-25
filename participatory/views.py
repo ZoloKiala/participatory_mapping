@@ -1,3 +1,4 @@
+import csv
 import json
 import re
 from collections import Counter
@@ -5,8 +6,9 @@ from functools import lru_cache
 from pathlib import Path
 
 from django.db.models import Count, Q
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from .models import IndicatorSelection, Location
@@ -694,6 +696,148 @@ def selection_results(request: HttpRequest) -> JsonResponse:
     )
 
     return JsonResponse({"results": list(results)})
+
+
+CSV_FIELDS = [
+    "id",
+    "country",
+    "district",
+    "indicator",
+    "severity",
+    "latitude",
+    "longitude",
+    "label",
+    "source_file",
+]
+
+
+class _Echo:
+    """File-like object that just returns the value written, for csv.writer."""
+
+    def write(self, value: str) -> str:
+        return value
+
+
+@require_GET
+def locations_csv(request: HttpRequest) -> StreamingHttpResponse:
+    """CSV export of locations honoring the same filters as the JSON endpoint."""
+
+    queryset = _apply_location_filters(request).values(
+        "external_id",
+        "district",
+        "indicator",
+        "severity",
+        "latitude",
+        "longitude",
+        "label",
+        "source_file",
+    )
+
+    writer = csv.writer(_Echo())
+
+    def stream():
+        yield writer.writerow(CSV_FIELDS)
+        for row in queryset.iterator(chunk_size=500):
+            yield writer.writerow(
+                [
+                    row["external_id"],
+                    DISTRICT_COUNTRY.get(row["district"], ""),
+                    row["district"],
+                    row["indicator"],
+                    row["severity"] if row["severity"] is not None else "",
+                    row["latitude"],
+                    row["longitude"],
+                    row["label"],
+                    row["source_file"],
+                ]
+            )
+
+    response = StreamingHttpResponse(stream(), content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="participatory_hotspots.csv"'
+    return response
+
+
+@require_GET
+def api_docs(request: HttpRequest) -> HttpResponse:
+    """Public API documentation page — listing endpoints and example URLs."""
+
+    base = request.build_absolute_uri("/").rstrip("/")
+
+    endpoints = [
+        {
+            "method": "GET",
+            "url": reverse("locations_geojson"),
+            "title": "Locations (GeoJSON)",
+            "description": "All hotspot points as a GeoJSON FeatureCollection. Each feature has the point geometry and properties (id, district, indicator, severity, source_file).",
+            "params": [
+                ("country", "Malawi or Zambia"),
+                ("district", "District name, e.g. Salima, Mumbwa"),
+                ("indicator", "Indicator key, e.g. flood, erosion, dam (repeatable)"),
+                ("category", "Participant category: Older_Men, Older_Women, Younger_Men, Younger_Women (repeatable)"),
+                ("severity", "Exact severity: 1, 3, or 5"),
+                ("severity_min / severity_max", "Severity range bounds"),
+                ("q", "Free-text search across label/name/indicator/district"),
+                ("limit", "Max features per response, default 2500, max 5000"),
+            ],
+            "examples": [
+                f"{base}/api/locations.geojson",
+                f"{base}/api/locations.geojson?country=Zambia",
+                f"{base}/api/locations.geojson?country=Malawi&district=Salima&severity=5",
+            ],
+        },
+        {
+            "method": "GET",
+            "url": reverse("locations_csv"),
+            "title": "Locations (CSV)",
+            "description": "Same data as the GeoJSON endpoint, returned as CSV for spreadsheets. Streamed — safe for large filter results. Use the same query params.",
+            "params": [
+                ("(same filters as the GeoJSON endpoint)", ""),
+            ],
+            "examples": [
+                f"{base}/api/locations.csv",
+                f"{base}/api/locations.csv?country=Zambia&district=Petauke",
+            ],
+        },
+        {
+            "method": "GET",
+            "url": reverse("district_boundaries_geojson"),
+            "title": "District Boundaries (GeoJSON)",
+            "description": "ADM2 district polygons (pre-simplified for fast loading). The `is_matched` property flags districts that intersect the current filter.",
+            "params": [
+                ("country", "Malawi or Zambia (omit for both — larger payload)"),
+                ("(any locations filter)", "narrows which districts are flagged is_matched=true"),
+            ],
+            "examples": [
+                f"{base}/api/districts.geojson?country=Zambia",
+            ],
+        },
+        {
+            "method": "GET",
+            "url": reverse("indicator_summary"),
+            "title": "Indicator Summary (JSON)",
+            "description": "Counts of locations per raw indicator value, honoring filters. Useful for ranking hotspot types within a district.",
+            "params": [
+                ("(any locations filter)", ""),
+            ],
+            "examples": [
+                f"{base}/api/indicators?country=Malawi",
+            ],
+        },
+        {
+            "method": "GET",
+            "url": reverse("selection_results"),
+            "title": "Selection Votes (JSON)",
+            "description": "Aggregated counts of user-submitted indicator selections per district.",
+            "params": [
+                ("district", "District name"),
+            ],
+            "examples": [
+                f"{base}/api/selections",
+            ],
+        },
+    ]
+
+    return render(request, "participatory/api_docs.html", {"endpoints": endpoints, "base_url": base})
 
 
 def error_404(request: HttpRequest, exception) -> HttpResponse:
