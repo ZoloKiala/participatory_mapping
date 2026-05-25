@@ -46,7 +46,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260525-api-page">
+  <link rel="stylesheet" href="{% static 'participatory/app.css' %}?v=20260525-hide-api-link">
 </head>
 <body>
   <div id="app-loader" class="app-loader" role="status" aria-live="polite" aria-label="Loading dashboard data">
@@ -104,10 +104,6 @@
               Explore community-identified soil, water, land-use, and livelihood hotspots across districts.
               Use the filters to compare hotspot types, severity levels, participant groups, and priority
               intervention areas.
-            </p>
-            <p class="onboarding-api-link">
-              Sharing this data?
-              <a href="{% url 'api_docs' %}" data-skip-loader="1">Open the API page</a>.
             </p>
           </div>
         </section>
@@ -512,6 +508,6 @@
       indicatorApiUrl: "{% url 'selection_results' %}?{{ query_string|safe }}"
     };
   </script>
-  <script src="{% static 'participatory/app.js' %}?v=20260525-api-page"></script>
+  <script src="{% static 'participatory/app.js' %}?v=20260525-hide-api-link"></script>
 </body>
 </html>

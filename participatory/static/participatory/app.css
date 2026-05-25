@@ -962,21 +962,6 @@ h3 {
   font-size: var(--type-card-title);
 }
 
-.onboarding-card p + p {
-  margin-top: 8px;
-}
-
-.onboarding-api-link a {
-  color: #1d7b5f;
-  font-weight: 600;
-  text-decoration: none;
-  border-bottom: 1px solid rgba(29, 123, 95, 0.35);
-}
-
-.onboarding-api-link a:hover {
-  border-bottom-color: #1d7b5f;
-}
-
 .onboarding-card p {
   margin: 0;
   color: var(--muted);
