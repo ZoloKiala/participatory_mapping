@@ -25,10 +25,10 @@
     const districtSelect = document.getElementById("district-select");
     if (!countrySelect || !districtSelect) return;
 
-    // Snapshot every option in its original order at startup so we can
-    // physically remove and re-insert nodes when the country changes.
-    // Material Web's md-outlined-select doesn't reliably honor `display:
-    // none` on slotted options, so we rebuild the slotted list instead.
+    // Snapshot every option in its original order so we can rebuild the
+    // slotted child list deterministically. Material Web's md-outlined-select
+    // doesn't reliably honor `display: none` on slotted options, so we
+    // physically detach/re-append nodes instead.
     const allOptions = Array.from(districtSelect.querySelectorAll("md-select-option"));
 
     function applyCountryFilter() {
@@ -56,9 +56,26 @@
       }
     }
 
-    countrySelect.addEventListener("change", applyCountryFilter);
-    countrySelect.addEventListener("input", applyCountryFilter);
-    applyCountryFilter();
+    // Material Web components are loaded via an ESM CDN module that resolves
+    // asynchronously. If we run before the components are upgraded, the
+    // initial filter runs against an inert host element and never takes.
+    // Wait for both custom elements to be defined, then wire up the filter.
+    const ready = window.customElements && customElements.whenDefined
+      ? Promise.all([
+          customElements.whenDefined("md-outlined-select"),
+          customElements.whenDefined("md-select-option"),
+        ])
+      : Promise.resolve();
+
+    ready.then(() => {
+      countrySelect.addEventListener("change", applyCountryFilter);
+      countrySelect.addEventListener("input", applyCountryFilter);
+      // Re-filter when the user opens the district dropdown, as a safety
+      // net in case the change event from md-outlined-select arrived before
+      // the component finished updating its internal options list.
+      districtSelect.addEventListener("opening", applyCountryFilter);
+      applyCountryFilter();
+    });
   })();
 
   (function setupSidebarToggle() {
