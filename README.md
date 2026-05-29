@@ -9,7 +9,14 @@ python -m venv pgis
 ./pgis/bin/python -m pip install -r requirements.txt
 ./pgis/bin/python manage.py migrate
 ./pgis/bin/python manage.py load_locations --csv preloaded_locations.csv --replace
+./pgis/bin/python manage.py load_locations --csv preloaded_locations_zambia.csv
 ```
+
+The second `load_locations` call adds the Zambia dataset. It is idempotent
+(`external_id` is unique and the loader uses `ignore_conflicts`), so re-running
+it is safe. Skip it and the dashboard — including the participant breakdown —
+will only show Malawi data locally. Production loads both CSVs automatically via
+the `Procfile`.
 
 ## Run
 

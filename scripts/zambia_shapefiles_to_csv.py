@@ -28,29 +28,41 @@ CATEGORY_PATTERNS: dict[str, re.Pattern[str]] = {
     "Younger_Women": re.compile(r"(?i)(?:young|younger)_women"),
 }
 
+# Strips a trailing demographic chunk (with any leading underscore) so we can
+# recover the "site" portion of a folder name like ``CFU_Ngabwe_Adult_Men``.
+DEMOGRAPHIC_SUFFIX_RE = re.compile(
+    r"_?(?:elder(?:ly)?|older|adult|young(?:er)?)_(?:men|women)$",
+    re.IGNORECASE,
+)
 
-def category_from_folder(folder: str) -> str:
+
+def category_from_name(name: str) -> str:
     for category, pattern in CATEGORY_PATTERNS.items():
-        if pattern.search(folder):
+        if pattern.search(name):
             return category
     return ""
 
 
-def derive_source_file(folder: str) -> str:
+def site_base(folder: str) -> str:
+    """Folder name with any trailing demographic suffix removed."""
+
+    return DEMOGRAPHIC_SUFFIX_RE.sub("", folder).rstrip("_")
+
+
+def derive_source_file(folder: str, shp_stem: str) -> str:
     """Produce a source_file string that the existing views can detect.
 
-    The views look for tokens like ``Older_Men_`` inside source_file.  The
-    raw folder name already follows that convention, but we standardise the
-    demographic suffix so Elder/Elderly map to Older.
+    The views look for canonical tokens like ``Older_Men`` inside source_file.
+    The demographic may live in the folder name (one shapefile per folder) or
+    in the shapefile name itself (several shapefiles in one folder), so we look
+    at both and standardise the suffix (Elder/Elderly/Adult -> Older,
+    Young -> Younger).
     """
 
-    category = category_from_folder(folder)
-    if category:
-        # Replace the matched demographic chunk with the canonical token so
-        # downstream filters work without changes.
-        for pattern in CATEGORY_PATTERNS.values():
-            folder = pattern.sub(category, folder)
-    return f"Zambia/{folder}.shp"
+    category = category_from_name(shp_stem) or category_from_name(folder)
+    if not category:
+        return f"Zambia/{folder}.shp"
+    return f"Zambia/{site_base(folder)}_{category}.shp"
 
 
 def next_id_seed() -> int:
@@ -88,72 +100,73 @@ def main() -> None:
     next_id = next_id_seed()
 
     for folder in sorted(p for p in SHAPEFILE_ROOT.iterdir() if p.is_dir()):
-        shp = next(folder.glob("*.shp"), None)
-        if shp is None:
+        shapefiles = sorted(folder.glob("*.shp"))
+        if not shapefiles:
             continue
-        gdf = gpd.read_file(shp)
-        if gdf.empty:
-            continue
-        if gdf.crs is None:
-            gdf = gdf.set_crs("EPSG:4326")
-        else:
-            gdf = gdf.to_crs("EPSG:4326")
-
-        # Some shapefiles use "Feature", others "Features"
-        feature_col = "Feature" if "Feature" in gdf.columns else (
-            "Features" if "Features" in gdf.columns else None
-        )
-        if feature_col is None:
-            print(f"  WARN: no Feature column in {shp.name}")
-            continue
-
-        joined = gpd.sjoin(gdf, boundaries, how="left", predicate="within")
-        unmatched = joined["district"].isna().sum()
-        if unmatched:
-            print(f"  {folder.name}: {unmatched}/{len(joined)} pts outside Zambia ADM2 boundaries")
-
-        source_file = derive_source_file(folder.name)
-        for _, feat in joined.iterrows():
-            geom = feat.geometry
-            if geom is None or geom.is_empty:
+        for shp in shapefiles:
+            gdf = gpd.read_file(shp)
+            if gdf.empty:
                 continue
-            district = (feat.get("district") or "").strip()
-            if not district:
-                # Fall back to a label derived from the folder name (without the
-                # demographic suffix) so the row is still loadable.
-                district = re.sub(
-                    r"_(?:elder(?:ly)?|older|young(?:er)?|adult)_(?:men|women)$",
-                    "",
-                    folder.name,
-                    flags=re.IGNORECASE,
-                ).split("_", 1)[-1].replace("_", " ").title()
-            indicator_value = feat.get(feature_col)
-            if indicator_value is None or (isinstance(indicator_value, float) and indicator_value != indicator_value):
-                indicator_raw = ""
+            if gdf.crs is None:
+                gdf = gdf.set_crs("EPSG:4326")
             else:
-                indicator_raw = str(indicator_value).strip()
-            severity_raw = feat.get("Severity")
-            try:
-                severity_int = int(severity_raw)
-            except (TypeError, ValueError):
-                severity_int = 0
+                gdf = gdf.to_crs("EPSG:4326")
 
-            pt_id = f"pt_{next_id:05d}"
-            next_id += 1
-            rows.append(
-                {
-                    "name": pt_id,
-                    "label": f"{district} - {indicator_raw}",
-                    "district_key": slug(district),
-                    "district": district,
-                    "attribute_1": indicator_raw,
-                    "attribute_2": f"severity={severity_int}",
-                    "latitude": f"{geom.y}",
-                    "longitude": f"{geom.x}",
-                    "source_file": source_file,
-                    "id": pt_id,
-                }
+            # Some shapefiles use "Feature", others "Features"
+            feature_col = "Feature" if "Feature" in gdf.columns else (
+                "Features" if "Features" in gdf.columns else None
             )
+            if feature_col is None:
+                print(f"  WARN: no Feature column in {shp.name}")
+                continue
+
+            joined = gpd.sjoin(gdf, boundaries, how="left", predicate="within")
+            unmatched = joined["district"].isna().sum()
+            if unmatched:
+                print(f"  {folder.name}/{shp.name}: {unmatched}/{len(joined)} pts outside Zambia ADM2 boundaries")
+
+            source_file = derive_source_file(folder.name, shp.stem)
+            for _, feat in joined.iterrows():
+                geom = feat.geometry
+                if geom is None or geom.is_empty:
+                    continue
+                district = (feat.get("district") or "").strip()
+                if not district:
+                    # Fall back to a label derived from the folder name (without
+                    # the demographic suffix) so the row is still loadable.
+                    district = re.sub(
+                        r"_(?:elder(?:ly)?|older|young(?:er)?|adult)_(?:men|women)$",
+                        "",
+                        folder.name,
+                        flags=re.IGNORECASE,
+                    ).split("_", 1)[-1].replace("_", " ").title()
+                indicator_value = feat.get(feature_col)
+                if indicator_value is None or (isinstance(indicator_value, float) and indicator_value != indicator_value):
+                    indicator_raw = ""
+                else:
+                    indicator_raw = str(indicator_value).strip()
+                severity_raw = feat.get("Severity")
+                try:
+                    severity_int = int(severity_raw)
+                except (TypeError, ValueError):
+                    severity_int = 0
+
+                pt_id = f"pt_{next_id:05d}"
+                next_id += 1
+                rows.append(
+                    {
+                        "name": pt_id,
+                        "label": f"{district} - {indicator_raw}",
+                        "district_key": slug(district),
+                        "district": district,
+                        "attribute_1": indicator_raw,
+                        "attribute_2": f"severity={severity_int}",
+                        "latitude": f"{geom.y}",
+                        "longitude": f"{geom.x}",
+                        "source_file": source_file,
+                        "id": pt_id,
+                    }
+                )
 
     if not rows:
         raise SystemExit("no rows produced")

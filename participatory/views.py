@@ -453,7 +453,13 @@ def _apply_location_filters_from_params(params):
         source_file_query = Q()
         for category in categories:
             for token in _category_tokens_for_filter(category):
-                source_file_query |= Q(source_file__icontains=f"{token}_")
+                # The demographic token can sit mid-name (Malawi:
+                # ``Older_Men_Mchinji.shp``) or at the end before the extension
+                # (Zambia: ``..._Older_Men.shp``), so match both delimiters.
+                source_file_query |= (
+                    Q(source_file__icontains=f"{token}_")
+                    | Q(source_file__icontains=f"{token}.")
+                )
         queryset = queryset.filter(source_file_query)
     if q:
         search_query = (
